@@ -1,6 +1,6 @@
 /*
   Based on: Arduino Starter Kit, Project 7 - Keyboard
-  Adds a pitch tuning potentiometer.
+  Adds a pitch tuning photoresistor.
 
   Base parts required:
   - two 10 kilohm resistors
@@ -10,17 +10,22 @@
   - piezo
 
   Extra parts:
-  - 2x potentiometer (1 just for volume adjustment, not used in the code)
+  - potentiometer (just for volume adjustment, not used in the code)
+  - photoresistor
+  - 10 kilohm resistor
 */
 
 const int BASE_TONE = 262;
-const int KEY_IN_SCALE[] = {0, 2, 4, 5};
+const int KEY_IN_SCALE[] = {0, 3, 5, 7};
 
+const int INFO_OUT = 13;
 const int KEYBOARD_IN = A0;
-const int POTENTIO_IN = A1;
+const int PHOTO_IN = A1;
 const int PIEZO_OUT = 8;
 
 bool DEBUG = 1;
+
+int photo_min, photo_max;
 
 
 void debug(String msg, bool nl=1, bool force=0) {
@@ -68,31 +73,61 @@ int read_key() {
 }
 
 
-float read_potentio() {
-  int analog = analogRead(POTENTIO_IN);
-  float mapped = (analog / 1023.0 - 0.5) * 2;
-  // debug("Potentiometer read " + String(analog) + ", mapped to " + String(mapped));
+void calibrate_photo(unsigned long end_time) {
+  debug("Calibrating photoresistor...");
+  
+  photo_min = 1023;
+  photo_max = 0;
+
+  while (millis() < end_time) {
+    int value = analogRead(PHOTO_IN);
+    if (value > photo_max) {
+      photo_max = value;
+    }
+    if (value < photo_min) {
+      photo_min = value;
+    }
+    delay(10);
+  }
+
+  debug("Photo min: " + String(photo_min) + ", photo max: " + String(photo_max));
+}
+
+
+float read_photo() {
+  int analog = analogRead(PHOTO_IN);
+  float mapped = ((float)analog - photo_min) / (photo_max - photo_min);
+  debug("Photoresistor read " + String(analog) + ", mapped to " + String(mapped));
   return mapped;
 }
 
 
 int get_tone(int key, float pitch_tune) {
-  return BASE_TONE * pow(2, (KEY_IN_SCALE[key - 1] + pitch_tune) / 12.0);
+  return BASE_TONE * pow(2, (KEY_IN_SCALE[key - 1] + 1 - pitch_tune) / 12.0);
 }
 
 
 void setup() {
   Serial.begin(9600);
+
+  pinMode(INFO_OUT, OUTPUT);
+  digitalWrite(INFO_OUT, HIGH);
+
+  calibrate_photo(millis() + 5000);
+
+  digitalWrite(INFO_OUT, LOW);
 }
 
 
 void loop() {
   int key_val = read_key();
-  float pitch_tune = read_potentio();
+  float pitch_tune = read_photo();
 
   if (key_val) {
     play(get_tone(key_val, pitch_tune));
   } else {
     mute();
   }
+
+  delay(10);
 }
