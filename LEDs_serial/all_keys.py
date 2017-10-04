@@ -1,12 +1,19 @@
 #!/usr/bin/env python3
 
+from functools import lru_cache
 import re
+import time
 
 import keyboard
+import mouse
 import serial
 
 
 ser = serial.Serial('COM3', 9600)  # Windows
+
+MOUSE_MIN_DIFF = 10
+last_mouse_x, last_mouse_y = mouse.get_position()
+last_mouse_move_time = time.time()
 
 
 with open('LEDs_serial.ino') as f:
@@ -14,14 +21,15 @@ with open('LEDs_serial.ino') as f:
 
 
 LEDS = int(re.search(r'const int LEDS = (\d+);', INO_LINES).group(1))
+DELAY = int(re.search(r'const int DELAY = (\d+);', INO_LINES).group(1)) / 1000.0  # seconds
 
 
-def get_ino_value(name, default):
+@lru_cache()
+def get_ino_value(name):
     if len(name) > 1:
         m = re.search(r'case (\d+): .* //.*%s' % name, INO_LINES)
         if m:
             return int(m.group(1))
-    return default
 
 
 def check_output():
@@ -31,18 +39,53 @@ def check_output():
         if '\n' in output:
             line, output = output.split('\n', 1)
 
-            # Python (Win) / tmux (Cygwin): gets printed with quite a delay
+            # Python (Win):
+            #   - tmux (Cygwin): gets printed with quite a delay
+            #   - PyCharm: immediate
             print(line)
 
 
 def send_key(e):
     if e.event_type == 'down':
-        value = get_ino_value(e.name, e.scan_code % LEDS)
+        value = get_ino_value(e.name) or e.scan_code % LEDS
+        ser.write([value])
+
+
+def send_mouse(e):
+    global last_mouse_x, last_mouse_y, last_mouse_move_time
+    value = None
+
+    if isinstance(e, mouse.ButtonEvent):
+        if e.event_type == mouse.DOUBLE:
+            # double click isn't recognized? this doesn't seem to work
+            value = get_ino_value('enter')
+        elif e.event_type == mouse.DOWN:
+            value = (
+                1 if e.button == mouse.LEFT
+                else 2 if e.button == mouse.RIGHT
+                else 3
+            )
+
+    elif isinstance(e, mouse.WheelEvent):
+        value = get_ino_value('page up' if e.delta > 0 else 'page down')
+
+    elif isinstance(e, mouse.MoveEvent):
+        if time.time() > last_mouse_move_time + DELAY:
+            x, y = mouse.get_position()
+            if x < last_mouse_x - MOUSE_MIN_DIFF or y < last_mouse_y - MOUSE_MIN_DIFF:
+                value = get_ino_value('up')
+            elif x > last_mouse_x + MOUSE_MIN_DIFF or y > last_mouse_y + MOUSE_MIN_DIFF:
+                value = get_ino_value('down')
+            last_mouse_x, last_mouse_y = x, y
+            last_mouse_move_time = time.time()
+
+    if value:
         ser.write([value])
 
 
 def main():
     keyboard.hook(send_key)
+    mouse.hook(send_mouse)
     check_output()
     keyboard.wait()  # probably not needed
 
