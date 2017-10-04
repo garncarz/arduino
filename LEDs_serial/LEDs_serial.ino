@@ -49,7 +49,7 @@ void set_led(int i, bool value) {
 
 
 void toggle_led(int i) {
-  if (i >= 0 && i <= LEDS) {
+  if (i >= 0 && i < LEDS) {
     set_led(i, !led_value[i]);
   }
 }
