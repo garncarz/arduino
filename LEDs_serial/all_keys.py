@@ -9,19 +9,24 @@ import mouse
 import serial
 
 
-ser = serial.Serial('COM3', 9600)  # Windows
+PORT = 'COM3'  # Windows
 
-MOUSE_MIN_DIFF = 10
+last_write_time = time.time()
+
+MOUSE_MIN_DIFF = 2
 last_mouse_x, last_mouse_y = mouse.get_position()
-last_mouse_move_time = time.time()
 
 
 with open('LEDs_serial.ino') as f:
     INO_LINES = f.read()
 
 
+BAUDRATE = int(re.search(r'Serial.begin\((\d+)\);', INO_LINES).group(1))
 LEDS = int(re.search(r'const int LEDS = (\d+);', INO_LINES).group(1))
 DELAY = int(re.search(r'const int DELAY = (\d+);', INO_LINES).group(1)) / 1000.0  # seconds
+
+
+ser = serial.Serial(PORT, BAUDRATE)
 
 
 @lru_cache()
@@ -45,14 +50,27 @@ def check_output():
             print(line)
 
 
+def write(value, delay=DELAY):
+    if not value:
+        return False
+
+    global last_write_time
+    if value < 20 or time.time() > last_write_time + delay:
+        ser.write([value])
+        last_write_time = time.time()
+        return True
+
+    return False
+
+
 def send_key(e):
     if e.event_type == 'down':
         value = get_ino_value(e.name) or e.scan_code % LEDS
-        ser.write([value])
+        write(value)
 
 
 def send_mouse(e):
-    global last_mouse_x, last_mouse_y, last_mouse_move_time
+    global last_mouse_x, last_mouse_y
     value = None
 
     if isinstance(e, mouse.ButtonEvent):
@@ -70,17 +88,14 @@ def send_mouse(e):
         value = get_ino_value('page up' if e.delta > 0 else 'page down')
 
     elif isinstance(e, mouse.MoveEvent):
-        if time.time() > last_mouse_move_time + DELAY:
-            x, y = mouse.get_position()
-            if x < last_mouse_x - MOUSE_MIN_DIFF or y < last_mouse_y - MOUSE_MIN_DIFF:
-                value = get_ino_value('up')
-            elif x > last_mouse_x + MOUSE_MIN_DIFF or y > last_mouse_y + MOUSE_MIN_DIFF:
-                value = get_ino_value('down')
-            last_mouse_x, last_mouse_y = x, y
-            last_mouse_move_time = time.time()
+        x, y = mouse.get_position()
+        if x < last_mouse_x - MOUSE_MIN_DIFF or y < last_mouse_y - MOUSE_MIN_DIFF:
+            value = get_ino_value('up')
+        elif x > last_mouse_x + MOUSE_MIN_DIFF or y > last_mouse_y + MOUSE_MIN_DIFF:
+            value = get_ino_value('down')
+        last_mouse_x, last_mouse_y = x, y
 
-    if value:
-        ser.write([value])
+    write(value)
 
 
 def main():

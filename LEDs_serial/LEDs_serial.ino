@@ -86,7 +86,7 @@ bool is_tilt_changed() {
 
 
 void setup() {
-  Serial.begin(9600);
+  Serial.begin(19200);
 
   pinMode(TILT_IN, INPUT);
   tilt_last_value = digitalRead(TILT_IN);
