@@ -1,4 +1,6 @@
 getch
 keyboard
 mouse
+numpy
+pyaudio
 pyserial

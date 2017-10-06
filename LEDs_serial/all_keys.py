@@ -56,7 +56,10 @@ def write(value, delay=DELAY):
 
     global last_write_time
     if value < 20 or time.time() > last_write_time + delay:
-        ser.write([value])
+        try:
+            ser.write([value])
+        except Exception as e:
+            print(e)
         last_write_time = time.time()
         return True
 

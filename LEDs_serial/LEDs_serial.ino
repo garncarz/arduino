@@ -22,7 +22,7 @@ bool led_value[LEDS], old_led_value[LEDS];
 
 const int DELAY = 100;
 
-bool DEBUG = 1;
+bool DEBUG = 0;
 
 
 void debug(String msg, bool nl=1, bool force=0) {
@@ -110,6 +110,10 @@ void loop() {
 
 void serialEvent() {
   int in = Serial.read();
+  if (in >= 10 && in <= 20) {
+    meter(in - 10);
+    return;
+  }
   switch(in) {
     case 20: shift_up(); break;  // left, up
     case 21: shift_down(); break;  // right, down
@@ -242,4 +246,14 @@ void blink_one(int i) {
   delay(DELAY / 5);
   
   set_led(i, old);
+}
+
+
+void meter(int max_val) {
+  for (int i = LEDS - 1; i >= max_val; i--) {
+    set_led(i, 0);
+  }
+  for (int i = 0; i < max_val; i++) {
+    set_led(i, 1);
+  }
 }
