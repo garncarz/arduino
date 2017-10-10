@@ -26,14 +26,23 @@ def main():
         logger.debug(f'Got {val}')
 
         if val == 31:
-            logger.info('Left click')
-            mouse.click(mouse.LEFT)
+            logger.info('Left press')
+            mouse.press(mouse.LEFT)
+        elif val == 32:
+            logger.info('Left release')
+            mouse.release(mouse.LEFT)
         elif val == 41:
-            logger.info('Middle click')
-            mouse.click(mouse.MIDDLE)
+            logger.info('Middle press')
+            mouse.press(mouse.MIDDLE)
+        elif val == 42:
+            logger.info('Middle release')
+            mouse.release(mouse.MIDDLE)
         elif val == 51:
-            logger.info('Right click')
-            mouse.click(mouse.RIGHT)
+            logger.info('Right press')
+            mouse.press(mouse.RIGHT)
+        elif val == 52:
+            logger.info('Right release')
+            mouse.release(mouse.RIGHT)
 
         elif val == 1:
             logger.info('Move left')

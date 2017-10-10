@@ -63,6 +63,9 @@ int read_button(int i) {
   if (val && !button_value[i]) {
     ret = 1;
   }
+  else if (!val && button_value[i]) {
+    ret = 2;
+  }
   button_value[i] = val;
   return ret;
 }
