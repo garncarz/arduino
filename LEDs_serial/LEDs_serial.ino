@@ -110,7 +110,7 @@ void loop() {
 
 void serialEvent() {
   int in = Serial.read();
-  if (in >= 10 && in <= 20) {
+  if (in >= 10 && in < 20) {
     meter(in - 10);
     return;
   }
