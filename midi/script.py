@@ -52,8 +52,8 @@ def write(*values):
         print(e)
 
 
-def stop():
-    write(get_ino_value('stop'))
+def stop(tone=0):
+    write(get_ino_value('stop'), tone)
 
 
 def play_midi(filename):
@@ -68,7 +68,7 @@ def play_midi(filename):
             write(get_ino_value('play'), msg.note)
         elif msg.type == 'note_off':
             logger.debug(f'stop {msg.note}')
-            stop()
+            stop(msg.note)
 
     stop()
 
