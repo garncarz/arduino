@@ -63,10 +63,10 @@ def play_midi(filename):
         if msg.channel == 9:  # drums
             continue
 
-        if msg.type == 'note_on':
+        if msg.type == 'note_on' and msg.velocity:
             logger.debug(f'play {msg.note}')
             write(get_ino_value('play'), msg.note)
-        elif msg.type == 'note_off':
+        elif msg.type == 'note_off' or (msg.type == 'note_on' and msg.velocity == 0):
             logger.debug(f'stop {msg.note}')
             stop(msg.note)
 
