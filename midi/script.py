@@ -52,8 +52,8 @@ def write(*values):
         print(e)
 
 
-def stop():
-    write(get_ino_value('stop'))
+def stop(tone=0):
+    write(get_ino_value('stop'), tone)
 
 
 def play_midi(filename):
@@ -63,12 +63,12 @@ def play_midi(filename):
         if msg.channel == 9:  # drums
             continue
 
-        if msg.type == 'note_on':
+        if msg.type == 'note_on' and msg.velocity:
             logger.debug(f'play {msg.note}')
             write(get_ino_value('play'), msg.note)
-        elif msg.type == 'note_off':
+        elif msg.type == 'note_off' or (msg.type == 'note_on' and msg.velocity == 0):
             logger.debug(f'stop {msg.note}')
-            stop()
+            stop(msg.note)
 
     stop()
 
