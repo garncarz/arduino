@@ -36,6 +36,31 @@ void setup() {
 }
 
 
+const char* state_name(State state) {
+  switch (state) {
+    case INTAKE: return "INTAKE";
+    case WORK: return "WORK";
+    case EXHAUST: return "EXHAUST";
+    default: return "UNKNOWN";
+  }
+}
+
+void print_status() {
+  int pressure = analogRead(SENSOR_PRESSURE);
+  bool upper_triggered = (digitalRead(SENSOR_UPPER) == LOW);
+  bool lower_triggered = (digitalRead(SENSOR_LOWER) == LOW);
+
+  Serial.print("State: ");
+  Serial.print(state_name(current_state));
+  Serial.print(", pressure: ");
+  Serial.print(pressure);
+  Serial.print(", upper: ");
+  Serial.print(upper_triggered ? "1" : "0");
+  Serial.print(", lower: ");
+  Serial.println(lower_triggered ? "1" : "0");
+}
+
+
 void loop() {
   switch (current_state) {
     case INTAKE:
@@ -61,5 +86,5 @@ void loop() {
   }
 
   delay(100);
-  Serial.println("State: " + String(current_state));
+  print_status();
 }
