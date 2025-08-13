@@ -1,16 +1,8 @@
-const int VALVE_INTAKE = 2;
-const int VALVE_EXHAUST = 3;
-const int VALVE_TO_TURBINE = 4;
+#include "constants.h"
+#include "logic.h"
 
-const int SENSOR_LOWER = 5;
-const int SENSOR_UPPER = 6;
-
+// Arduino-specific analog pin definition
 const int SENSOR_PRESSURE = A0;
-const int PRESSURE_TARGET = 700;
-
-enum State { INTAKE, WORK, EXHAUST };
-State current_state = INTAKE;
-
 
 bool pressurized_enough() { return analogRead(SENSOR_PRESSURE) >= PRESSURE_TARGET; }
 bool water_reached_upper_level() { return digitalRead(SENSOR_UPPER) == LOW; }
@@ -62,28 +54,7 @@ void print_status() {
 
 
 void loop() {
-  switch (current_state) {
-    case INTAKE:
-      if (pressurized_enough()) {
-        close_valve(VALVE_INTAKE);
-        current_state = WORK;
-      } else open_valve(VALVE_INTAKE);
-      break;
-
-    case WORK:
-      if (water_below_lower_level()) {
-        close_valve(VALVE_TO_TURBINE);
-        current_state = EXHAUST;
-      } else open_valve(VALVE_TO_TURBINE);
-      break;
-
-    case EXHAUST:
-      if (water_reached_upper_level()) {
-        close_valve(VALVE_EXHAUST);
-        current_state = INTAKE;
-      } else open_valve(VALVE_EXHAUST);
-      break;
-  }
+  logic();
 
   delay(100);
   print_status();
