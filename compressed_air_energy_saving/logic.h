@@ -1,6 +1,11 @@
 #pragma once
 
-enum State { INTAKE, WORK, EXHAUST, WAIT };
+// Forward declare millis() only for non-Arduino environments
+#ifndef ARDUINO
+unsigned long millis();
+#endif
+
+enum State { INTAKE, WORK, EXHAUST, WAIT_FOR_INTAKE, WAIT_FOR_WORK };
 
 // Array to track the state of each barrel (sized for maximum)
 extern State barrel_states[]; // Will be sized according to MAX_BARRELS
@@ -11,7 +16,8 @@ inline const char* state_name(State state) {
     case INTAKE: return "INTAKE";
     case WORK: return "WORK";
     case EXHAUST: return "EXHAUST";
-    case WAIT: return "WAIT";
+    case WAIT_FOR_INTAKE: return "WAIT_FOR_INTAKE";
+    case WAIT_FOR_WORK: return "WAIT_FOR_WORK";
     default: return "UNKNOWN";
   }
 }
@@ -23,3 +29,9 @@ void open_valve(int valve);
 void close_valve(int valve);
 
 void logic();
+
+// Timing and performance measurement functions
+void init_timing_system();
+void record_state_duration(int barrel_index, State from_state, unsigned long duration);
+unsigned long get_average_duration(int barrel_index, State state);
+void print_timing_stats();

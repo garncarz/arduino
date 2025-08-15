@@ -34,6 +34,7 @@ void setup() {
   }
 
   Serial.begin(9600);
+  init_timing_system(); // Initialize timing measurement system
 }
 
 void print_status() {
@@ -58,10 +59,87 @@ void print_status() {
   Serial.println();
 }
 
+void print_timing_stats_arduino() {
+  Serial.println(); // Add blank line before timing output
+  Serial.println("=== TIMING SUMMARY ===");
+  for (int i = 0; i < NUM_BARRELS; i++) {
+    unsigned long avg_intake = get_average_duration(i, INTAKE);
+    unsigned long avg_work = get_average_duration(i, WORK);
+    unsigned long avg_exhaust = get_average_duration(i, EXHAUST);
+    unsigned long avg_wait_intake = get_average_duration(i, WAIT_FOR_INTAKE);
+    unsigned long avg_wait_work = get_average_duration(i, WAIT_FOR_WORK);
+
+    if (avg_intake > 0 || avg_work > 0 || avg_exhaust > 0 || avg_wait_intake > 0 || avg_wait_work > 0) {
+      Serial.print("Barrel ");
+      Serial.print(i);
+      Serial.print(" averages: ");
+      if (avg_intake > 0) {
+        Serial.print("INTAKE=");
+        Serial.print(avg_intake);
+        Serial.print("ms ");
+      }
+      if (avg_work > 0) {
+        Serial.print("WORK=");
+        Serial.print(avg_work);
+        Serial.print("ms ");
+      }
+      if (avg_exhaust > 0) {
+        Serial.print("EXHAUST=");
+        Serial.print(avg_exhaust);
+        Serial.print("ms ");
+      }
+      if (avg_wait_intake > 0) {
+        Serial.print("WAIT_INTAKE=");
+        Serial.print(avg_wait_intake);
+        Serial.print("ms ");
+      }
+      if (avg_wait_work > 0) {
+        Serial.print("WAIT_WORK=");
+        Serial.print(avg_wait_work);
+        Serial.print("ms ");
+      }
+      Serial.println();
+    }
+  }
+  Serial.println(); // Add blank line after timing output
+}
+
+void print_timing_predictions() {
+  Serial.println("=== TIMING PREDICTIONS ===");
+  for (int i = 0; i < NUM_BARRELS; i++) {
+    unsigned long avg_intake = get_average_duration(i, INTAKE);
+    unsigned long avg_work = get_average_duration(i, WORK);
+    unsigned long avg_exhaust = get_average_duration(i, EXHAUST);
+    unsigned long cycle_time = avg_intake + avg_work + avg_exhaust;
+
+    if (cycle_time > 0) {
+      Serial.print("Barrel");
+      Serial.print(i);
+      Serial.print(" cycle: ");
+      Serial.print(cycle_time);
+      Serial.print("ms, start INTAKE ");
+      Serial.print(avg_work + avg_exhaust);
+      Serial.println("ms early");
+    }
+  }
+  Serial.println(); // Add blank line after predictions
+}// Call this function periodically (e.g., every 30 seconds) to print timing data
+unsigned long last_timing_print = 0;
+void periodic_timing_report() {
+  if (millis() - last_timing_print > 30000) { // Every 30 seconds
+    print_timing_stats_arduino();
+    print_timing_predictions();
+    last_timing_print = millis();
+  }
+}
+
 
 void loop() {
   logic();
 
   delay(100);
   print_status();
+
+  // Print timing statistics every 30 seconds
+  periodic_timing_report();
 }

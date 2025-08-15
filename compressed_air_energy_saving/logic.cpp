@@ -1,16 +1,106 @@
+#ifdef ARDUINO
+#include <Arduino.h>
+#endif
 #include "constants.h"
 #include "logic.h"
 
 // Define the number of barrels (can be changed dynamically)
-int NUM_BARRELS = 2;
+int NUM_BARRELS = 1;
 
-// Initialize barrel states - all start in WAIT (system will choose one to start)
-State barrel_states[MAX_BARRELS] = {WAIT, WAIT, WAIT, WAIT};
+// Initialize barrel states - all start in WAIT_FOR_INTAKE (system will choose ones to start)
+State barrel_states[MAX_BARRELS] = {WAIT_FOR_INTAKE, WAIT_FOR_INTAKE, WAIT_FOR_INTAKE, WAIT_FOR_INTAKE};
 
-// Check if all barrels are in WAIT state (system startup scenario)
-bool all_barrels_waiting() {
+// Initialize barrel timers - track when each barrel entered its current state
+unsigned long barrel_timers[MAX_BARRELS] = {0, 0, 0, 0};
+
+// Timing data using simple arrays for Arduino compatibility
+// [barrel][state][history_index] - state index: 0=INTAKE, 1=WORK, 2=EXHAUST, 3=WAIT_FOR_INTAKE, 4=WAIT_FOR_WORK
+unsigned long timing_history[MAX_BARRELS][5][10];
+unsigned long current_durations[MAX_BARRELS][5]; // Current cycle durations
+int history_index[MAX_BARRELS] = {0, 0, 0, 0}; // Current index in circular buffer
+
+// Initialize timing system
+void init_timing_system() {
+  for (int i = 0; i < MAX_BARRELS; i++) {
+    for (int state = 0; state < 5; state++) {
+      for (int j = 0; j < 10; j++) {
+        timing_history[i][state][j] = 0;
+      }
+      current_durations[i][state] = 0;
+    }
+    history_index[i] = 0;
+    barrel_timers[i] = 0;
+  }
+}
+
+// Helper function to record state duration and update history
+void record_state_duration(int barrel_index, State from_state, unsigned long duration) {
+  if (barrel_index < 0 || barrel_index >= MAX_BARRELS) return; // Bounds check
+
+  int idx = history_index[barrel_index];
+
+  // Record current duration (using enum value directly as array index)
+  current_durations[barrel_index][from_state] = duration;
+
+  // Add to history
+  timing_history[barrel_index][from_state][idx] = duration;
+
+  // Advance circular buffer index (shared across all states for this barrel)
+  history_index[barrel_index] = (idx + 1) % 10;
+}
+
+// Calculate average duration for a state across recent history
+unsigned long get_average_duration(int barrel_index, State state) {
+  if (barrel_index < 0 || barrel_index >= MAX_BARRELS) return 0; // Bounds check
+
+  unsigned long total = 0;
+  int count = 0;
+
+  // Use enum value directly as array index
+  for (int i = 0; i < 10; i++) {
+    if (timing_history[barrel_index][state][i] > 0) {
+      total += timing_history[barrel_index][state][i];
+      count++;
+    }
+  }
+
+  return count > 0 ? total / count : 0;
+}// Print timing statistics for all barrels
+void print_timing_stats() {
   for (int i = 0; i < NUM_BARRELS; i++) {
-    if (barrel_states[i] != WAIT) {
+    unsigned long avg_intake = get_average_duration(i, INTAKE);
+    unsigned long avg_work = get_average_duration(i, WORK);
+    unsigned long avg_exhaust = get_average_duration(i, EXHAUST);
+    unsigned long avg_wait_intake = get_average_duration(i, WAIT_FOR_INTAKE);
+    unsigned long avg_wait_work = get_average_duration(i, WAIT_FOR_WORK);
+
+    if (avg_intake > 0 || avg_work > 0 || avg_exhaust > 0 || avg_wait_intake > 0 || avg_wait_work > 0) {
+      // This would be Serial.print in real Arduino
+      // For now, keeping it simple for testing
+    }
+  }
+}
+
+// Count how many barrels are in INTAKE state
+int count_barrels_in_intake() {
+  int count = 0;
+  for (int i = 0; i < NUM_BARRELS; i++) {
+    if (barrel_states[i] == INTAKE) {
+      count++;
+    }
+  }
+  return count;
+}
+
+// Check if any barrel is currently in INTAKE state
+bool any_barrel_in_intake() {
+  return count_barrels_in_intake() > 0;
+}
+
+// Check if we're in startup phase (no barrel has ever worked yet)
+bool is_startup_phase() {
+  for (int i = 0; i < NUM_BARRELS; i++) {
+    if (barrel_states[i] == WORK) {
       return false;
     }
   }
@@ -45,18 +135,27 @@ bool any_barrel_working() {
   return false;
 }
 
-void handle_barrel_logic(int barrel_index, bool is_startup = false) {
-  switch (barrel_states[barrel_index]) {
+void handle_barrel_logic(int barrel_index) {
+  State current_state = barrel_states[barrel_index];
+  unsigned long current_time = millis();
+
+  switch (current_state) {
     case INTAKE:
       if (pressurized_enough(barrel_index)) {
+        // Record INTAKE duration before transitioning
+        unsigned long intake_duration = current_time - barrel_timers[barrel_index];
+        record_state_duration(barrel_index, INTAKE, intake_duration);
+
         close_valve(VALVES_INTAKE[barrel_index]);
         // Only transition to WORK if no other barrel is working
         if (!any_other_barrel_working(barrel_index)) {
           barrel_states[barrel_index] = WORK;
+          barrel_timers[barrel_index] = current_time; // Record WORK start time
           // Immediately start working
           open_valve(VALVES_TO_TURBINE[barrel_index]);
         } else {
-          barrel_states[barrel_index] = WAIT;
+          barrel_states[barrel_index] = WAIT_FOR_WORK;
+          barrel_timers[barrel_index] = current_time; // Record WAIT_FOR_WORK start time
         }
       } else {
         open_valve(VALVES_INTAKE[barrel_index]);
@@ -70,8 +169,13 @@ void handle_barrel_logic(int barrel_index, bool is_startup = false) {
 
     case WORK:
       if (water_below_lower_level(barrel_index)) {
+        // Record WORK duration before transitioning
+        unsigned long work_duration = current_time - barrel_timers[barrel_index];
+        record_state_duration(barrel_index, WORK, work_duration);
+
         close_valve(VALVES_TO_TURBINE[barrel_index]);
         barrel_states[barrel_index] = EXHAUST;
+        barrel_timers[barrel_index] = current_time; // Record EXHAUST start time
         // Immediately start exhausting
         open_valve(VALVES_EXHAUST[barrel_index]);
       } else {
@@ -86,45 +190,81 @@ void handle_barrel_logic(int barrel_index, bool is_startup = false) {
 
     case EXHAUST:
       if (water_reached_upper_level(barrel_index)) {
+        // Record EXHAUST duration before transitioning
+        unsigned long exhaust_duration = current_time - barrel_timers[barrel_index];
+        record_state_duration(barrel_index, EXHAUST, exhaust_duration);
+
         close_valve(VALVES_EXHAUST[barrel_index]);
-        barrel_states[barrel_index] = INTAKE;
-        // Don't immediately open intake - wait for pressure check
+        // For single barrel system, go directly to INTAKE
+        if (NUM_BARRELS == 1) {
+          barrel_states[barrel_index] = INTAKE;
+          barrel_timers[barrel_index] = current_time; // Record INTAKE start time
+        } else {
+          // For multi-barrel, go directly to INTAKE if no other barrel is preparing
+          // This enables overlapping preparation for continuous energy
+          if (count_barrels_in_intake() == 0) {
+            barrel_states[barrel_index] = INTAKE;
+            barrel_timers[barrel_index] = current_time; // Record INTAKE start time
+            // Open intake valve immediately to start pressurizing
+            open_valve(VALVES_INTAKE[barrel_index]);
+          } else {
+            barrel_states[barrel_index] = WAIT_FOR_INTAKE;
+            barrel_timers[barrel_index] = current_time; // Record WAIT_FOR_INTAKE start time
+          }
+        }
       } else {
         open_valve(VALVES_EXHAUST[barrel_index]);
       }
-      // Ensure other valves are closed
-      close_valve(VALVES_INTAKE[barrel_index]);
+      // Ensure other valves are closed (except intake if we just transitioned to INTAKE)
+      if (barrel_states[barrel_index] != INTAKE) {
+        close_valve(VALVES_INTAKE[barrel_index]);
+      }
       close_valve(VALVES_TO_TURBINE[barrel_index]);
       break;
 
-    case WAIT:
-      // Waiting for other barrels to finish WORK
-      if (!any_other_barrel_active(barrel_index)) {
-        // If all barrels are in WAIT (system startup), only barrel 0 starts
-        if (is_startup) {
-          if (barrel_index == 0) {
-            barrel_states[barrel_index] = INTAKE;
-          }
-          // Other barrels stay in WAIT
-        } else {
-          // Normal case: no other barrel is active, this barrel can start
-          barrel_states[barrel_index] = INTAKE;
-        }
+    case WAIT_FOR_INTAKE:
+      // During startup, allow up to 2 barrels to start INTAKE
+      // During normal operation, allow one barrel to prepare while another works
+      if ((is_startup_phase() && count_barrels_in_intake() < 2) ||
+          (!is_startup_phase() && count_barrels_in_intake() == 0)) {
+        // Record WAIT_FOR_INTAKE duration before transitioning
+        unsigned long wait_duration = current_time - barrel_timers[barrel_index];
+        record_state_duration(barrel_index, WAIT_FOR_INTAKE, wait_duration);
+
+        barrel_states[barrel_index] = INTAKE;
+        barrel_timers[barrel_index] = current_time; // Record INTAKE start time
       }
       // Keep all valves closed while waiting
       close_valve(VALVES_INTAKE[barrel_index]);
       close_valve(VALVES_EXHAUST[barrel_index]);
       close_valve(VALVES_TO_TURBINE[barrel_index]);
       break;
+
+    case WAIT_FOR_WORK:
+      // Waiting for current working barrel to finish (this barrel is pressurized)
+      if (!any_other_barrel_working(barrel_index)) {
+        // Record WAIT_FOR_WORK duration before transitioning
+        unsigned long wait_duration = current_time - barrel_timers[barrel_index];
+        record_state_duration(barrel_index, WAIT_FOR_WORK, wait_duration);
+
+        // No other barrel is working, can start immediately
+        barrel_states[barrel_index] = WORK;
+        barrel_timers[barrel_index] = current_time; // Record WORK start time
+        open_valve(VALVES_TO_TURBINE[barrel_index]);
+      }
+      // Keep all valves closed while waiting
+      close_valve(VALVES_INTAKE[barrel_index]);
+      close_valve(VALVES_EXHAUST[barrel_index]);
+      if (barrel_states[barrel_index] != WORK) {
+        close_valve(VALVES_TO_TURBINE[barrel_index]);
+      }
+      break;
   }
 }
 
 void logic() {
-  // Check if this is system startup (all barrels in WAIT)
-  bool is_startup = all_barrels_waiting();
-
   // Process logic for each barrel
   for (int i = 0; i < NUM_BARRELS; i++) {
-    handle_barrel_logic(i, is_startup);
+    handle_barrel_logic(i);
   }
 }
