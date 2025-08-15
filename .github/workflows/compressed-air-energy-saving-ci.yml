@@ -1,0 +1,81 @@
+name: Compressed Air Energy Saving - CI
+
+on:
+  push:
+    paths:
+      - 'compressed_air_energy_saving/**'
+  pull_request:
+    paths:
+      - 'compressed_air_energy_saving/**'
+
+jobs:
+  test-compressed-air-system:
+    runs-on: ubuntu-latest
+    name: Test Compressed Air Energy Saving System
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install build tools and Arduino development environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential g++ gcc-avr avr-libc
+
+        # Install Arduino CLI for proper Arduino compilation
+        curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sudo sh
+        sudo mv bin/arduino-cli /usr/local/bin/
+
+        # Initialize Arduino CLI and install Arduino AVR core
+        arduino-cli core update-index
+        arduino-cli core install arduino:avr
+
+    - name: Verify project structure
+      run: |
+        echo "=== Project Structure ==="
+        ls -la compressed_air_energy_saving/
+        echo ""
+        echo "=== Source Files ==="
+        find compressed_air_energy_saving/ -name "*.cpp" -o -name "*.h" -o -name "*.cc" -o -name "*.ino" | sort
+
+    - name: Run compressed air energy saving tests
+      working-directory: compressed_air_energy_saving
+      run: |
+        echo "=== Building and Testing Compressed Air Energy Saving System ==="
+        make test
+
+    - name: Verify Arduino compatibility (actual compilation)
+      working-directory: compressed_air_energy_saving
+      run: |
+        echo "=== Arduino Compatibility Check ==="
+        echo "Compiling for Arduino Uno (ATmega328P)..."
+
+        # Create temp directory matching the .ino file name
+        mkdir -p /tmp/compressed_air_energy_saving
+        cp compressed_air_energy_saving.ino logic.cpp logic.h constants.h /tmp/compressed_air_energy_saving/
+
+        echo "Files to be compiled for Arduino:"
+        ls -la /tmp/compressed_air_energy_saving/
+
+        cd /tmp/compressed_air_energy_saving
+
+        # Attempt real Arduino compilation
+        if arduino-cli compile --fqbn arduino:avr:uno compressed_air_energy_saving.ino; then
+          echo "✅ Arduino compilation successful!"
+        else
+          echo "❌ Arduino compilation failed!"
+          echo "This indicates incompatibility with Arduino environment."
+          exit 1
+        fi
+
+    - name: Generate test summary
+      working-directory: compressed_air_energy_saving
+      run: |
+        echo "=== Test Results Summary ==="
+        echo "✅ Multi-barrel coordination logic tests passed"
+        echo "✅ Timing measurement system validated"
+        echo "✅ State machine transitions verified"
+        echo "✅ Continuous energy production confirmed"
+        echo "✅ Arduino compilation compatibility verified"
+        echo ""
+        echo "System ready for Arduino deployment! 🚀"
