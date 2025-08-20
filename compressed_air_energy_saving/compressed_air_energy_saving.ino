@@ -14,8 +14,8 @@ bool water_below_lower_level(int barrel_index) {
   return digitalRead(SENSORS_LOWER[barrel_index]) == HIGH;
 }
 
-void open_valve(int valve) { digitalWrite(valve, HIGH); }
-void close_valve(int valve) { digitalWrite(valve, LOW); }
+void open_valve(int valve) { digitalWrite(valve, LOW); }  // LOW triggers relay (opens valve)
+void close_valve(int valve) { digitalWrite(valve, HIGH); } // HIGH releases relay (closes valve)
 
 
 void setup() {

@@ -43,14 +43,16 @@ The system ensures continuous energy production by:
 ![Circuit Diagram](schema.jpg)
 
 ### Per Barrel (up to 4 barrels supported):
-- **3 Solenoid Valves**:
+- **3 Solenoid Valves** (controlled via Songle SRD-5VDC-SL-C relay module):
   - Intake valve (air compression)
-  - Exhaust valve (pressure release)  
+  - Exhaust valve (pressure release)
   - Turbine valve (energy generation)
 - **2 Water Level Sensors**:
   - Lower level sensor (work completion detection)
   - Upper level sensor (exhaust completion detection)
 - **1 Pressure Sensor**: Monitors compression level
+
+**Note**: The system uses low-triggered relay modules (active LOW) - valves open when Arduino pin is LOW, close when HIGH.
 
 ### Arduino Connections
 
