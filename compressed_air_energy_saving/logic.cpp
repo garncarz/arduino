@@ -92,6 +92,17 @@ int count_barrels_in_intake() {
   return count;
 }
 
+// Count how many barrels are in WORK state
+int count_barrels_in_work() {
+  int count = 0;
+  for (int i = 0; i < NUM_BARRELS; i++) {
+    if (barrel_states[i] == WORK) {
+      count++;
+    }
+  }
+  return count;
+}
+
 // Check if any barrel is currently in INTAKE state
 bool any_barrel_in_intake() {
   return count_barrels_in_intake() > 0;
@@ -195,21 +206,33 @@ void handle_barrel_logic(int barrel_index) {
         record_state_duration(barrel_index, EXHAUST, exhaust_duration);
 
         close_valve(VALVES_EXHAUST[barrel_index]);
+
         // For single barrel system, go directly to INTAKE
         if (NUM_BARRELS == 1) {
           barrel_states[barrel_index] = INTAKE;
           barrel_timers[barrel_index] = current_time; // Record INTAKE start time
+        } else if (NUM_BARRELS == 2) {
+          // For 2-barrel system: always go directly to INTAKE for continuous production
+          // One barrel should always be preparing while the other works
+          barrel_states[barrel_index] = INTAKE;
+          barrel_timers[barrel_index] = current_time;
+          open_valve(VALVES_INTAKE[barrel_index]);
         } else {
-          // For multi-barrel, go directly to INTAKE if no other barrel is preparing
-          // This enables overlapping preparation for continuous energy
-          if (count_barrels_in_intake() == 0) {
+          // For 3+ barrels: use more complex coordination
+          // If no barrel is working and no barrel is preparing, start preparing immediately
+          if (count_barrels_in_work() == 0 && count_barrels_in_intake() == 0) {
             barrel_states[barrel_index] = INTAKE;
-            barrel_timers[barrel_index] = current_time; // Record INTAKE start time
-            // Open intake valve immediately to start pressurizing
+            barrel_timers[barrel_index] = current_time;
+            open_valve(VALVES_INTAKE[barrel_index]);
+          }
+          // If no other barrel is preparing, start preparing for next cycle
+          else if (count_barrels_in_intake() == 0) {
+            barrel_states[barrel_index] = INTAKE;
+            barrel_timers[barrel_index] = current_time;
             open_valve(VALVES_INTAKE[barrel_index]);
           } else {
             barrel_states[barrel_index] = WAIT_FOR_INTAKE;
-            barrel_timers[barrel_index] = current_time; // Record WAIT_FOR_INTAKE start time
+            barrel_timers[barrel_index] = current_time;
           }
         }
       } else {
@@ -222,11 +245,21 @@ void handle_barrel_logic(int barrel_index) {
       close_valve(VALVES_TO_TURBINE[barrel_index]);
       break;
 
-    case WAIT_FOR_INTAKE:
-      // During startup, allow up to 2 barrels to start INTAKE
-      // During normal operation, allow one barrel to prepare while another works
-      if ((is_startup_phase() && count_barrels_in_intake() < 2) ||
-          (!is_startup_phase() && count_barrels_in_intake() == 0)) {
+    case WAIT_FOR_INTAKE: {
+      // For 2-barrel system: immediately start INTAKE if no other barrel is preparing
+      // For 3+ barrels: use more selective logic
+      bool should_start_intake = false;
+      if (NUM_BARRELS == 2) {
+        // 2-barrel: during startup allow both, during normal operation maintain exactly one barrel in INTAKE
+        should_start_intake = (is_startup_phase() && count_barrels_in_intake() < 2) ||
+                             (!is_startup_phase() && count_barrels_in_intake() == 0);
+      } else {
+        // 3+ barrels: startup allows multiple, normal operation is more selective
+        should_start_intake = ((is_startup_phase() && count_barrels_in_intake() < 2) ||
+                              (!is_startup_phase() && (count_barrels_in_intake() == 0 || count_barrels_in_work() == 0)));
+      }
+
+      if (should_start_intake) {
         // Record WAIT_FOR_INTAKE duration before transitioning
         unsigned long wait_duration = current_time - barrel_timers[barrel_index];
         record_state_duration(barrel_index, WAIT_FOR_INTAKE, wait_duration);
@@ -239,6 +272,7 @@ void handle_barrel_logic(int barrel_index) {
       close_valve(VALVES_EXHAUST[barrel_index]);
       close_valve(VALVES_TO_TURBINE[barrel_index]);
       break;
+    } // end of WAIT_FOR_INTAKE case
 
     case WAIT_FOR_WORK:
       // Waiting for current working barrel to finish (this barrel is pressurized)

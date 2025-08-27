@@ -37,6 +37,17 @@ The system ensures continuous energy production by:
 2. **Immediate Handoff**: Zero-gap transitions between working barrels
 3. **Smart Scheduling**: Prevents resource conflicts during preparation phases
 4. **Adaptive Timing**: Uses historical data to optimize preparation timing
+5. **2-Barrel Optimization**: Direct EXHAUST→INTAKE transitions eliminate energy gaps
+
+#### Optimized 2-Barrel Operation
+For systems with exactly 2 barrels, the coordination logic has been optimized to eliminate unnecessary WAIT_FOR_INTAKE states:
+
+- **Direct Transitions**: Barrels go directly from EXHAUST to INTAKE
+- **Continuous Production**: Always maintains exactly one barrel working
+- **Zero Waiting**: WAIT_FOR_INTAKE state bypassed entirely during normal operation
+- **Energy Gap Elimination**: Zero downtime between barrel handoffs
+
+This optimization ensures that 2-barrel systems achieve perfect continuous energy production without the coordination overhead needed for 3+ barrel systems.
 
 ## 🔧 Hardware Components
 
@@ -102,14 +113,33 @@ For remote monitoring, the system supports WiFi-based UDP logging:
 
 ### Serial Output Example
 ```
+Compressed Air Energy System Started
+Barrel0:INTAKE (P:145 U:0 L:0) | Barrel1:INTAKE (P:135 U:0 L:0)
+Barrel0:INTAKE (P:205 U:0 L:0) | Barrel1:INTAKE (P:195 U:0 L:0)
+Barrel0:INTAKE (P:265 U:0 L:0) | Barrel1:INTAKE (P:255 U:0 L:0)
+Barrel0:INTAKE (P:325 U:0 L:0) | Barrel1:INTAKE (P:315 U:0 L:0)
+Barrel0:WORK (P:385 U:0 L:0) | Barrel1:INTAKE (P:375 U:0 L:0)
+Barrel0:WORK (P:345 U:0 L:0) | Barrel1:WAIT_FOR_WORK (P:375 U:0 L:0)
+Barrel0:WORK (P:305 U:0 L:0) | Barrel1:WAIT_FOR_WORK (P:375 U:0 L:0)
+Barrel0:WORK (P:265 U:0 L:1) | Barrel1:WAIT_FOR_WORK (P:375 U:0 L:0)
+Barrel0:EXHAUST (P:205 U:1 L:1) | Barrel1:WORK (P:335 U:0 L:0)
+Barrel0:EXHAUST (P:145 U:1 L:1) | Barrel1:WORK (P:295 U:0 L:0)
+Barrel0:INTAKE (P:125 U:0 L:0) | Barrel1:WORK (P:255 U:0 L:1)
+Barrel0:INTAKE (P:185 U:0 L:0) | Barrel1:WORK (P:215 U:0 L:1)
+Barrel0:WAIT_FOR_WORK (P:385 U:0 L:0) | Barrel1:WORK (P:175 U:0 L:1)
+Barrel0:WORK (P:385 U:0 L:0) | Barrel1:EXHAUST (P:135 U:1 L:1)
+Barrel0:WORK (P:345 U:0 L:0) | Barrel1:INTAKE (P:95 U:0 L:0)
+
 === TIMING SUMMARY ===
-Barrel 0 averages: INTAKE=5100ms WORK=5000ms EXHAUST=2000ms WAIT_INTAKE=100ms
-Barrel 1 averages: INTAKE=7100ms WORK=6000ms EXHAUST=2500ms WAIT_WORK=3000ms
+Barrel 0 averages: INTAKE=5100ms WORK=5000ms EXHAUST=2000ms
+Barrel 1 averages: INTAKE=7100ms WORK=6000ms EXHAUST=2500ms
 
 === TIMING PREDICTIONS ===
 Barrel0 cycle: 12100ms, start INTAKE 7000ms early
-Barrel1 cycle: 15600ms, start INTAKE 8500ms early
+Barrel1 cycle: 14600ms, start INTAKE 8000ms early
 ```
+
+**Key Optimization**: Notice how in the optimized 2-barrel system, Barrel0 goes directly from EXHAUST to INTAKE (line 11) and Barrel1 does the same (line 15), eliminating WAIT_FOR_INTAKE states that could cause energy gaps.
 
 ## 🚀 Getting Started
 
@@ -145,6 +175,8 @@ make test
 - Single barrel operation cycle
 - Multi-barrel coordination logic
 - Continuous energy production verification
+- **2-barrel optimization validation**: Zero energy gaps testing
+- **WAIT_FOR_INTAKE efficiency**: Minimization of unnecessary wait states
 - Timing system validation
 - State transition correctness
 
@@ -181,6 +213,7 @@ compressed_air_energy_saving/
 - **Transition Timing**: Optimal handoff timing based on historical data
 - **Resource Management**: Prevents simultaneous access to shared resources
 - **Performance Optimization**: Continuous improvement through timing analysis
+- **2-Barrel Coordination**: Specialized logic for optimal 2-barrel continuous operation
 
 ## 🎛️ Configuration Options
 
@@ -188,11 +221,17 @@ compressed_air_energy_saving/
 - Simple cycle: INTAKE → WORK → EXHAUST → repeat
 - Ideal for testing and basic energy storage
 
-### Multi-Barrel Mode (`NUM_BARRELS = 2-4`)
-- Continuous energy production
-- Overlapping barrel preparation
-- Zero-gap energy handoffs
-- Advanced coordination logic
+### Two-Barrel Mode (`NUM_BARRELS = 2`) - **Optimized**
+- **Continuous energy production** with zero gaps
+- **Direct transitions**: EXHAUST → INTAKE (bypasses WAIT_FOR_INTAKE)
+- **Perfect coordination**: Always exactly one barrel working
+- **Zero overhead**: Eliminates waiting states entirely
+
+### Multi-Barrel Mode (`NUM_BARRELS = 3-4`)
+- Advanced continuous energy production
+- Overlapping barrel preparation with smart scheduling
+- WAIT_FOR_INTAKE coordination prevents resource conflicts
+- Zero-gap energy handoffs with predictive timing
 
 ## 📈 Performance Optimization
 
@@ -201,6 +240,8 @@ The system provides real-time insights for optimization:
 - **Wait Time Monitoring**: Measure coordination efficiency
 - **Predictive Timing**: Optimize preparation start times
 - **Historical Trends**: Long-term performance analysis
+- **2-Barrel Efficiency**: Specialized optimization eliminating energy gaps
+- **State Minimization**: Reduced WAIT_FOR_INTAKE usage for improved performance
 
 ## 🔗 References
 

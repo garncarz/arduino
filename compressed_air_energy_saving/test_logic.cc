@@ -401,10 +401,64 @@ void print_timing_summary() {
     std::cout << "=== Timing system test passed! ===" << std::endl;
 }
 
+void test_no_energy_gaps() {
+    std::cout << "\n=== Testing NO ENERGY GAPS (strict timing) ===" << std::endl;
+
+    // Reset system
+    init_valve_states();
+    reset_test_state();
+    NUM_BARRELS = 2;
+
+    // Count working barrels manually (since function is in logic.cpp)
+    auto count_working = []() -> int {
+        int count = 0;
+        for (int i = 0; i < NUM_BARRELS; i++) {
+            if (barrel_states[i] == WORK) count++;
+        }
+        return count;
+    };
+
+    // Start both barrels in intake
+    logic();
+    assert(barrel_states[0] == INTAKE && barrel_states[1] == INTAKE);
+
+    // Barrel0 reaches pressure first after 4 seconds
+    advance_time(4000);
+    mock_pressurized[0] = true;
+    logic();
+    assert(barrel_states[0] == WORK);
+    assert(barrel_states[1] == INTAKE);
+    std::cout << "✓ Barrel0 starts working, Barrel1 continues preparing" << std::endl;
+
+    // Barrel1 finishes intake (total 6 seconds)
+    advance_time(2000);
+    mock_pressurized[1] = true;
+    logic();
+    assert(barrel_states[0] == WORK);
+    assert(barrel_states[1] == WAIT_FOR_WORK);
+    std::cout << "✓ Barrel1 ready to work, waiting for handoff" << std::endl;
+
+    // Barrel0 finishes work after total 3 seconds working
+    advance_time(1000);
+    mock_water_below[0] = true;
+    logic();
+    assert(barrel_states[0] == EXHAUST);
+    assert(barrel_states[1] == WORK);
+    std::cout << "✓ Immediate handoff: Barrel0 → EXHAUST, Barrel1 → WORK" << std::endl;
+
+    // This is the critical moment - verify no gaps
+    int working_barrels = count_working();
+    assert(working_barrels == 1);
+    std::cout << "✓ Continuous energy: exactly 1 barrel working during transition" << std::endl;
+
+    std::cout << "=== NO ENERGY GAPS test passed! ===" << std::endl;
+}
+
 int main() {
     test_single_barrel_cycle();
     test_multi_barrel_coordination();
     test_continuous_energy_production();
     test_timing_system();
+    test_no_energy_gaps();
     return 0;
 }
