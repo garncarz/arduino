@@ -186,6 +186,10 @@ Automated testing via GitHub Actions:
 - Confirms Arduino compilation compatibility
 - Ensures code quality and reliability
 
+## 🤖 Development Methodology
+
+This project's code and comprehensive test suite were primarily written by GitHub Copilot (Claude Sonnet 4) through iterative prompting. The logic is validated both through rigorous software testing and real Arduino hardware verification.
+
 ## 📁 Project Structure
 
 ```
