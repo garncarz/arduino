@@ -1,6 +1,27 @@
 #include "constants.h"
 #include "logic.h"
 
+// WiFi support for Arduino Uno R4 WiFi
+#ifdef ARDUINO_UNOR4_WIFI
+#include "WiFiS3.h"
+#include "WiFiUdp.h"
+
+// Try to include WiFi credentials, with fallback if file doesn't exist
+#if __has_include("wifi_credentials.h")
+  #include "wifi_credentials.h"
+#else
+  const char* WIFI_SSID = "geonika";
+  const char* WIFI_PASSWORD = "geo123";
+#endif
+
+// UDP target for log messages
+const char* UDP_HOST = "255.255.255.255";  // Broadcast
+const int UDP_PORT = 1768;
+
+WiFiUDP udp;
+bool wifi_connected = false;
+#endif
+
 // Arduino-specific analog pin definitions for pressure sensors
 const int SENSORS_PRESSURE[MAX_BARRELS] = {A0, A1, A2, A3};
 
@@ -17,8 +38,60 @@ bool water_below_lower_level(int barrel_index) {
 void open_valve(int valve) { digitalWrite(valve, LOW); }  // LOW triggers relay (opens valve)
 void close_valve(int valve) { digitalWrite(valve, HIGH); } // HIGH releases relay (closes valve)
 
+#ifdef ARDUINO_UNOR4_WIFI
+void setup_wifi() {
+  Serial.print("Connecting to WiFi");
+  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
+
+  for (int attempts = 0; attempts < 20 && WiFi.status() != WL_CONNECTED; attempts++) {
+    delay(500);
+    Serial.print(".");
+    Serial.flush();  // Ensure dots appear immediately
+  }
+
+  if (WiFi.status() == WL_CONNECTED) {
+    wifi_connected = true;
+    udp.begin(UDP_PORT);
+    Serial.println();
+    Serial.print("WiFi connected! IP: ");
+    Serial.println(WiFi.localIP());
+    Serial.print("Log messages will be sent to: ");
+    Serial.print(UDP_HOST);
+    Serial.print(":");
+    Serial.println(UDP_PORT);
+  } else {
+    Serial.println();
+    Serial.println("WiFi connection failed - continuing with Serial only");
+  }
+}
+
+// Send log message via both Serial and WiFi UDP
+void log(const String& message) {
+  // Always print to Serial
+  Serial.println(message);
+
+  // Also send via WiFi if connected
+  if (wifi_connected && WiFi.status() == WL_CONNECTED) {
+    udp.beginPacket(UDP_HOST, UDP_PORT);
+    udp.println(message);
+    udp.endPacket();
+  }
+}
+#else
+// Fallback for non-WiFi boards
+void log(const String& message) {
+  Serial.println(message);
+}
+#endif
+
 
 void setup() {
+  Serial.begin(9600);
+
+#ifdef ARDUINO_UNOR4_WIFI
+  setup_wifi();
+#endif
+
   // Setup all barrels
   for (int i = 0; i < NUM_BARRELS; i++) {
     pinMode(VALVES_INTAKE[i], OUTPUT);
@@ -33,35 +106,30 @@ void setup() {
     close_valve(VALVES_TO_TURBINE[i]);
   }
 
-  Serial.begin(9600);
   init_timing_system(); // Initialize timing measurement system
+
+  log("Compressed Air Energy System Started");
 }
 
 void print_status() {
+  String status = "";
   for (int i = 0; i < NUM_BARRELS; i++) {
     int pressure = analogRead(SENSORS_PRESSURE[i]);
     bool upper_triggered = (digitalRead(SENSORS_UPPER[i]) == LOW);
     bool lower_triggered = (digitalRead(SENSORS_LOWER[i]) == LOW);
 
-    if (i > 0) Serial.print(" | ");
-    Serial.print("Barrel");
-    Serial.print(i);
-    Serial.print(": ");
-    Serial.print(state_name(barrel_states[i]));
-    Serial.print(" (P:");
-    Serial.print(pressure);
-    Serial.print(" U:");
-    Serial.print(upper_triggered ? "1" : "0");
-    Serial.print(" L:");
-    Serial.print(lower_triggered ? "1" : "0");
-    Serial.print(")");
+    if (i > 0) status += " | ";
+    status += "Barrel" + String(i) + ":" + String(state_name(barrel_states[i]));
+    status += " (P:" + String(pressure);
+    status += " U:" + String(upper_triggered ? "1" : "0");
+    status += " L:" + String(lower_triggered ? "1" : "0") + ")";
   }
-  Serial.println();
+  log(status);
 }
 
 void print_timing_stats_arduino() {
-  Serial.println(); // Add blank line before timing output
-  Serial.println("=== TIMING SUMMARY ===");
+  log("");
+  log("=== TIMING SUMMARY ===");
   for (int i = 0; i < NUM_BARRELS; i++) {
     unsigned long avg_intake = get_average_duration(i, INTAKE);
     unsigned long avg_work = get_average_duration(i, WORK);
@@ -70,42 +138,20 @@ void print_timing_stats_arduino() {
     unsigned long avg_wait_work = get_average_duration(i, WAIT_FOR_WORK);
 
     if (avg_intake > 0 || avg_work > 0 || avg_exhaust > 0 || avg_wait_intake > 0 || avg_wait_work > 0) {
-      Serial.print("Barrel ");
-      Serial.print(i);
-      Serial.print(" averages: ");
-      if (avg_intake > 0) {
-        Serial.print("INTAKE=");
-        Serial.print(avg_intake);
-        Serial.print("ms ");
-      }
-      if (avg_work > 0) {
-        Serial.print("WORK=");
-        Serial.print(avg_work);
-        Serial.print("ms ");
-      }
-      if (avg_exhaust > 0) {
-        Serial.print("EXHAUST=");
-        Serial.print(avg_exhaust);
-        Serial.print("ms ");
-      }
-      if (avg_wait_intake > 0) {
-        Serial.print("WAIT_INTAKE=");
-        Serial.print(avg_wait_intake);
-        Serial.print("ms ");
-      }
-      if (avg_wait_work > 0) {
-        Serial.print("WAIT_WORK=");
-        Serial.print(avg_wait_work);
-        Serial.print("ms ");
-      }
-      Serial.println();
+      String timing = "Barrel " + String(i) + " averages: ";
+      if (avg_intake > 0) timing += "INTAKE=" + String(avg_intake) + "ms ";
+      if (avg_work > 0) timing += "WORK=" + String(avg_work) + "ms ";
+      if (avg_exhaust > 0) timing += "EXHAUST=" + String(avg_exhaust) + "ms ";
+      if (avg_wait_intake > 0) timing += "WAIT_INTAKE=" + String(avg_wait_intake) + "ms ";
+      if (avg_wait_work > 0) timing += "WAIT_WORK=" + String(avg_wait_work) + "ms ";
+      log(timing);
     }
   }
-  Serial.println(); // Add blank line after timing output
+  log("");
 }
 
 void print_timing_predictions() {
-  Serial.println("=== TIMING PREDICTIONS ===");
+  log("=== TIMING PREDICTIONS ===");
   for (int i = 0; i < NUM_BARRELS; i++) {
     unsigned long avg_intake = get_average_duration(i, INTAKE);
     unsigned long avg_work = get_average_duration(i, WORK);
@@ -113,16 +159,12 @@ void print_timing_predictions() {
     unsigned long cycle_time = avg_intake + avg_work + avg_exhaust;
 
     if (cycle_time > 0) {
-      Serial.print("Barrel");
-      Serial.print(i);
-      Serial.print(" cycle: ");
-      Serial.print(cycle_time);
-      Serial.print("ms, start INTAKE ");
-      Serial.print(avg_work + avg_exhaust);
-      Serial.println("ms early");
+      String prediction = "Barrel" + String(i) + " cycle: " + String(cycle_time) +
+                         "ms, start INTAKE " + String(avg_work + avg_exhaust) + "ms early";
+      log(prediction);
     }
   }
-  Serial.println(); // Add blank line after predictions
+  log("");
 }// Call this function periodically (e.g., every 30 seconds) to print timing data
 unsigned long last_timing_print = 0;
 void periodic_timing_report() {

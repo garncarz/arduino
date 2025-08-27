@@ -74,6 +74,32 @@ The system continuously monitors and records:
 - **Cycle Predictions**: Optimal timing for barrel preparation
 - **Performance Trends**: Historical analysis for system optimization
 
+### WiFi Logging (Arduino Uno R4 WiFi)
+For remote monitoring, the system supports WiFi-based UDP logging:
+
+**Setup:**
+1. Create `wifi_credentials.h` file with your network details:
+   ```cpp
+   #ifndef WIFI_CREDENTIALS_H
+   #define WIFI_CREDENTIALS_H
+   const char* WIFI_SSID = "YourWiFiName";
+   const char* WIFI_PASSWORD = "YourPassword";
+   #endif
+   ```
+
+2. The system broadcasts log messages to `255.255.255.255:1768` (UDP)
+
+**Monitoring Options:**
+- **Android**: [UDP Terminal](https://play.google.com/store/apps/details?id=com.hardcodedjoy.udpterminal) - Listen on port 1768
+- **Computer**: `nc -u -l 1768` (netcat command)
+- **Phone Hotspot**: Works perfectly with Android hotspot networks
+
+**Benefits:**
+- Real-time monitoring without serial cable connection
+- Remote system diagnostics and performance analysis
+- Continuous logging during field operations
+- Multiple devices can receive the same log stream simultaneously
+
 ### Serial Output Example
 ```
 === TIMING SUMMARY ===
