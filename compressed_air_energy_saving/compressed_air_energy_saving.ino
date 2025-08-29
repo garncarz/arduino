@@ -1,26 +1,7 @@
 #include "constants.h"
 #include "logic.h"
-
-// WiFi support for Arduino Uno R4 WiFi
-#ifdef ARDUINO_UNOR4_WIFI
-#include "WiFiS3.h"
-#include "WiFiUdp.h"
-
-// Try to include WiFi credentials, with fallback if file doesn't exist
-#if __has_include("wifi_credentials.h")
-  #include "wifi_credentials.h"
-#else
-  const char* WIFI_SSID = "geonika";
-  const char* WIFI_PASSWORD = "geo123";
-#endif
-
-// UDP target for log messages
-const char* UDP_HOST = "255.255.255.255";  // Broadcast
-const int UDP_PORT = 1768;
-
-WiFiUDP udp;
-bool wifi_connected = false;
-#endif
+#include "commands.h"
+#include "wifi.h"
 
 // Arduino-specific analog pin definitions for pressure sensors
 const int SENSORS_PRESSURE[MAX_BARRELS] = {A0, A1, A2, A3};
@@ -38,52 +19,21 @@ bool water_below_lower_level(int barrel_index) {
 void open_valve(int valve) { digitalWrite(valve, LOW); }  // LOW triggers relay (opens valve)
 void close_valve(int valve) { digitalWrite(valve, HIGH); } // HIGH releases relay (closes valve)
 
-#ifdef ARDUINO_UNOR4_WIFI
-void setup_wifi() {
-  Serial.print("Connecting to WiFi");
-  WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
-
-  for (int attempts = 0; attempts < 20 && WiFi.status() != WL_CONNECTED; attempts++) {
-    delay(500);
-    Serial.print(".");
-    Serial.flush();  // Ensure dots appear immediately
-  }
-
-  if (WiFi.status() == WL_CONNECTED) {
-    wifi_connected = true;
-    udp.begin(UDP_PORT);
-    Serial.println();
-    Serial.print("WiFi connected! IP: ");
-    Serial.println(WiFi.localIP());
-    Serial.print("Log messages will be sent to: ");
-    Serial.print(UDP_HOST);
-    Serial.print(":");
-    Serial.println(UDP_PORT);
-  } else {
-    Serial.println();
-    Serial.println("WiFi connection failed - continuing with Serial only");
-  }
-}
-
-// Send log message via both Serial and WiFi UDP
-void log(const String& message) {
-  // Always print to Serial
-  Serial.println(message);
-
-  // Also send via WiFi if connected
-  if (wifi_connected && WiFi.status() == WL_CONNECTED) {
-    udp.beginPacket(UDP_HOST, UDP_PORT);
-    udp.println(message);
-    udp.endPacket();
-  }
-}
-#else
-// Fallback for non-WiFi boards
+#ifndef ARDUINO_UNOR4_WIFI
+// Fallback log function for non-WiFi boards
 void log(const String& message) {
   Serial.println(message);
 }
 #endif
 
+// Check for incoming Serial commands (shared by WiFi and non-WiFi)
+void process_serial_commands() {
+  if (Serial.available()) {
+    String command = Serial.readStringUntil('\n');
+    log("Serial Command received: " + command);
+    process_command(command);
+  }
+}
 
 void setup() {
   Serial.begin(9600);
@@ -177,6 +127,15 @@ void periodic_timing_report() {
 
 
 void loop() {
+  // Process incoming commands
+#ifdef ARDUINO_UNOR4_WIFI
+  if (is_wifi_connected()) {
+    process_udp_commands();
+  }
+#endif
+  process_serial_commands();
+
+  // Run main logic (respects manual mode)
   logic();
 
   delay(100);

@@ -10,6 +10,10 @@ int NUM_BARRELS = 1;
 // Initialize barrel states - all start in WAIT_FOR_INTAKE (system will choose ones to start)
 State barrel_states[MAX_BARRELS] = {WAIT_FOR_INTAKE, WAIT_FOR_INTAKE, WAIT_FOR_INTAKE, WAIT_FOR_INTAKE};
 
+// Global manual override system
+bool manual_mode = false;
+State manual_states[MAX_BARRELS] = {WAIT_FOR_INTAKE, WAIT_FOR_INTAKE, WAIT_FOR_INTAKE, WAIT_FOR_INTAKE};
+
 // Initialize barrel timers - track when each barrel entered its current state
 unsigned long barrel_timers[MAX_BARRELS] = {0, 0, 0, 0};
 
@@ -101,6 +105,33 @@ int count_barrels_in_work() {
     }
   }
   return count;
+}
+
+// Apply valve actions for a given state (used by manual override)
+void apply_valve_actions(int barrel_index, State state) {
+  switch (state) {
+    case INTAKE:
+      open_valve(VALVES_INTAKE[barrel_index]);
+      close_valve(VALVES_EXHAUST[barrel_index]);
+      close_valve(VALVES_TO_TURBINE[barrel_index]);
+      break;
+    case WORK:
+      close_valve(VALVES_INTAKE[barrel_index]);
+      close_valve(VALVES_EXHAUST[barrel_index]);
+      open_valve(VALVES_TO_TURBINE[barrel_index]);
+      break;
+    case EXHAUST:
+      close_valve(VALVES_INTAKE[barrel_index]);
+      open_valve(VALVES_EXHAUST[barrel_index]);
+      close_valve(VALVES_TO_TURBINE[barrel_index]);
+      break;
+    case WAIT_FOR_INTAKE:
+    case WAIT_FOR_WORK:
+      close_valve(VALVES_INTAKE[barrel_index]);
+      close_valve(VALVES_EXHAUST[barrel_index]);
+      close_valve(VALVES_TO_TURBINE[barrel_index]);
+      break;
+  }
 }
 
 // Check if any barrel is currently in INTAKE state
@@ -299,6 +330,23 @@ void handle_barrel_logic(int barrel_index) {
 void logic() {
   // Process logic for each barrel
   for (int i = 0; i < NUM_BARRELS; i++) {
-    handle_barrel_logic(i);
+    if (manual_mode) {
+      // Manual mode: apply manual states directly
+      if (barrel_states[i] != manual_states[i]) {
+        // Record duration of previous state before manual change
+        unsigned long state_duration = millis() - barrel_timers[i];
+        record_state_duration(i, barrel_states[i], state_duration);
+
+        // Apply manual state
+        barrel_states[i] = manual_states[i];
+        barrel_timers[i] = millis();
+
+        // Apply appropriate valve actions for manual state
+        apply_valve_actions(i, manual_states[i]);
+      }
+    } else {
+      // Automatic mode: normal logic
+      handle_barrel_logic(i);
+    }
   }
 }

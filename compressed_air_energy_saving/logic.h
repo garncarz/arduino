@@ -10,6 +10,10 @@ enum State { INTAKE, WORK, EXHAUST, WAIT_FOR_INTAKE, WAIT_FOR_WORK };
 // Array to track the state of each barrel (sized for maximum)
 extern State barrel_states[]; // Will be sized according to MAX_BARRELS
 
+// Global manual override system
+extern bool manual_mode;
+extern State manual_states[];
+
 // Utility function to convert state enum to string
 inline const char* state_name(State state) {
   switch (state) {

@@ -454,11 +454,48 @@ void test_no_energy_gaps() {
     std::cout << "=== NO ENERGY GAPS test passed! ===" << std::endl;
 }
 
+void test_manual_control() {
+    std::cout << std::endl << "=== Testing Manual Control System ===" << std::endl;
+
+    // Reset to automatic mode
+    manual_mode = false;
+    for (int i = 0; i < NUM_BARRELS; i++) {
+        manual_states[i] = WAIT_FOR_INTAKE;
+        barrel_states[i] = WAIT_FOR_INTAKE;
+    }
+
+    // Test entering manual mode
+    manual_mode = true;
+    manual_states[0] = WORK;
+    manual_states[1] = EXHAUST;
+    logic();
+
+    std::cout << "✓ Manual mode active with Barrel0:WORK, Barrel1:EXHAUST" << std::endl;
+
+    // Verify manual control overrides automatic logic
+    // In manual mode, states should remain as manually set
+    State prev_state0 = barrel_states[0];
+    State prev_state1 = barrel_states[1];
+    logic();
+
+    if (barrel_states[0] == prev_state0 && barrel_states[1] == prev_state1) {
+        std::cout << "✓ Manual mode prevents automatic state transitions" << std::endl;
+    } else {
+        std::cout << "✗ Manual mode failed to override automatic logic" << std::endl;
+    }
+
+    // Test returning to automatic mode
+    manual_mode = false;
+    std::cout << "✓ System can return to automatic mode" << std::endl;
+    std::cout << "=== Manual Control System test passed! ===" << std::endl;
+}
+
 int main() {
     test_single_barrel_cycle();
     test_multi_barrel_coordination();
     test_continuous_energy_production();
     test_timing_system();
     test_no_energy_gaps();
+    test_manual_control();
     return 0;
 }

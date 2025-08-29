@@ -141,6 +141,106 @@ Barrel1 cycle: 14600ms, start INTAKE 8000ms early
 
 **Key Optimization**: Notice how in the optimized 2-barrel system, Barrel0 goes directly from EXHAUST to INTAKE (line 11) and Barrel1 does the same (line 15), eliminating WAIT_FOR_INTAKE states that could cause energy gaps.
 
+## 🎛️ Manual Control Mode
+
+The system supports manual override of automatic barrel coordination for testing, maintenance, and custom operations.
+
+### Command Interface
+Manual commands can be sent via:
+- **Serial connection** (9600 baud)
+- **WiFi UDP** (port 1768, same as logging port)
+
+### Available Commands
+
+#### Mode Control
+```
+MODE AUTO    # Switch to automatic operation
+MODE MANUAL  # Enable manual control mode
+```
+
+#### Direct Barrel Control
+```
+CMD <STATE> <BARREL>    # Set specific barrel to specific state
+```
+
+**Examples:**
+```
+CMD INTAKE 0      # Force Barrel 0 to INTAKE state
+CMD WORK 1        # Force Barrel 1 to WORK state
+CMD EXHAUST 0     # Force Barrel 0 to EXHAUST state
+```
+
+**Supported States:**
+- `INTAKE` - Pressurize barrel with compressed air
+- `WORK` - Generate energy through turbine
+- `EXHAUST` - Release pressure and refill with water
+
+#### System Status
+```
+STATUS    # Display current mode and all barrel states
+HELP      # Show available commands
+```
+
+### Manual Mode Features
+
+#### Global Control
+- **Single Mode Setting**: One global manual mode affects all barrels
+- **Persistent State**: Manual mode remains active until explicitly disabled
+- **No Timeouts**: Manual control persists indefinitely (no automatic return to auto mode)
+- **Override Protection**: Manual mode completely overrides automatic state machine
+
+#### Safety & Flexibility
+- **Real-time Switching**: Can switch between manual and automatic at any time
+- **State Preservation**: Manual states persist until explicitly changed
+- **Full Valve Control**: Manual mode directly controls valve positions
+- **Monitoring Continues**: Sensor readings and logging continue in manual mode
+
+### Example Manual Session
+```bash
+# Connect via serial or UDP
+> MODE MANUAL
+Manual mode activated
+
+> STATUS
+Mode: MANUAL
+Barrel0: EXHAUST  Barrel1: WORK
+
+> CMD INTAKE 0
+Barrel 0 set to INTAKE
+
+> CMD EXHAUST 1
+Barrel 1 set to EXHAUST
+
+> STATUS
+Mode: MANUAL
+Barrel0: INTAKE  Barrel1: EXHAUST
+
+> MODE AUTO
+Automatic mode activated
+```
+
+### WiFi Manual Control
+For remote operation, you can send commands via UDP to the same port used for logging:
+
+**Using netcat (Linux/Mac):**
+```bash
+echo "MODE MANUAL" | nc -u -w1 192.168.1.100 1768
+echo "CMD WORK 0" | nc -u -w1 192.168.1.100 1768
+echo "STATUS" | nc -u -w1 192.168.1.100 1768
+```
+
+**Using UDP Terminal (Android):**
+1. Set target IP to Arduino's WiFi IP
+2. Set port to 1768
+3. Type commands and press send
+
+### Use Cases
+- **System Testing**: Manually cycle through barrel states for validation
+- **Maintenance**: Isolate specific barrels for inspection
+- **Troubleshooting**: Force specific states to diagnose issues
+- **Custom Operations**: Non-standard barrel coordination patterns
+- **Emergency Control**: Override automatic logic in fault conditions
+
 ## 🚀 Getting Started
 
 ### Prerequisites

@@ -1,0 +1,101 @@
+#include "constants.h"
+#include "logic.h"
+#include "commands.h"
+
+// Parse and execute manual override commands (shared by both WiFi and Serial)
+void process_command(String command) {
+  command.trim();
+  command.toUpperCase();
+
+  if (command.startsWith("MODE ")) {
+    String mode_str = command.substring(5);  // Remove "MODE "
+    mode_str.trim();
+
+    if (mode_str == "MANUAL") {
+      manual_mode = true;
+      log("System set to MANUAL mode - automatic logic disabled");
+      log("Use CMD <STATE> <BARREL> to control individual barrels");
+    } else if (mode_str == "AUTO") {
+      manual_mode = false;
+      log("System set to AUTO mode - automatic logic enabled");
+    } else {
+      log("ERROR: Invalid mode. Use: MODE AUTO or MODE MANUAL");
+    }
+    return;
+  }
+
+  if (command.startsWith("CMD ")) {
+    if (!manual_mode) {
+      log("ERROR: System is in AUTO mode. Use 'MODE MANUAL' first");
+      return;
+    }
+
+    String params = command.substring(4);  // Remove "CMD "
+    int firstSpace = params.indexOf(' ');
+
+    if (firstSpace == -1) {
+      log("ERROR: Invalid command format. Use: CMD <STATE> <BARREL>");
+      return;
+    }
+
+    String state_str = params.substring(0, firstSpace);
+    String barrel_str = params.substring(firstSpace + 1);
+    int barrel_num = barrel_str.toInt();
+
+    // Validate barrel number
+    if (barrel_num < 0 || barrel_num >= NUM_BARRELS) {
+      log("ERROR: Invalid barrel number. Use 0-" + String(NUM_BARRELS-1));
+      return;
+    }
+
+    // Parse state
+    State new_state;
+    bool valid_state = true;
+    if (state_str == "INTAKE") {
+      new_state = INTAKE;
+    } else if (state_str == "WORK") {
+      new_state = WORK;
+    } else if (state_str == "EXHAUST") {
+      new_state = EXHAUST;
+    } else if (state_str == "WAIT_INTAKE" || state_str == "WAIT_FOR_INTAKE") {
+      new_state = WAIT_FOR_INTAKE;
+    } else if (state_str == "WAIT_WORK" || state_str == "WAIT_FOR_WORK") {
+      new_state = WAIT_FOR_WORK;
+    } else {
+      valid_state = false;
+    }
+
+    if (!valid_state) {
+      log("ERROR: Invalid state. Use: INTAKE, WORK, EXHAUST, WAIT_INTAKE, WAIT_WORK");
+      return;
+    }
+
+    // Apply manual state
+    manual_states[barrel_num] = new_state;
+    log("Manual command: Barrel" + String(barrel_num) + " set to " + String(state_name(new_state)));
+
+  } else if (command == "STATUS") {
+    log("=== SYSTEM STATUS ===");
+    if (manual_mode) {
+      log("Mode: MANUAL");
+      for (int i = 0; i < NUM_BARRELS; i++) {
+        log("Barrel" + String(i) + ": " + String(state_name(manual_states[i])) + " (manual)");
+      }
+    } else {
+      log("Mode: AUTO");
+      for (int i = 0; i < NUM_BARRELS; i++) {
+        log("Barrel" + String(i) + ": " + String(state_name(barrel_states[i])) + " (auto)");
+      }
+    }
+  } else if (command == "HELP") {
+    log("=== AVAILABLE COMMANDS ===");
+    log("MODE <AUTO|MANUAL> - Switch between automatic and manual control");
+    log("CMD <STATE> <BARREL> - Set barrel state (only in manual mode)");
+    log("  States: INTAKE, WORK, EXHAUST, WAIT_INTAKE, WAIT_WORK");
+    log("  Example: CMD INTAKE 0");
+    log("STATUS - Show current system and barrel status");
+    log("HELP - Show this help");
+  } else {
+    log("Unknown command: " + command + ". Type HELP for available commands.");
+  }
+}
