@@ -25,9 +25,10 @@ void process_command(String command) {
   }
 
   if (command.startsWith("CMD ")) {
+    // Automatically switch to manual mode if not already in manual mode
     if (!manual_mode) {
-      log("ERROR: System is in AUTO mode. Use 'MODE MANUAL' first");
-      return;
+      manual_mode = true;
+      log("Auto-switching to MANUAL mode for direct barrel control");
     }
 
     String params = command.substring(4);  // Remove "CMD "
@@ -90,7 +91,7 @@ void process_command(String command) {
   } else if (command == "HELP") {
     log("=== AVAILABLE COMMANDS ===");
     log("MODE <AUTO|MANUAL> - Switch between automatic and manual control");
-    log("CMD <STATE> <BARREL> - Set barrel state (only in manual mode)");
+    log("CMD <STATE> <BARREL> - Set barrel state (auto-switches to manual mode)");
     log("  States: INTAKE, WORK, EXHAUST, WAIT_INTAKE, WAIT_WORK");
     log("  Example: CMD INTAKE 0");
     log("STATUS - Show current system and barrel status");
