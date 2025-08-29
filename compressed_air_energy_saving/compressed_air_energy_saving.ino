@@ -29,10 +29,10 @@ bool pressurized_enough(int barrel_index) {
   return analogRead(SENSORS_PRESSURE[barrel_index]) >= PRESSURE_TARGET;
 }
 bool water_reached_upper_level(int barrel_index) {
-  return digitalRead(SENSORS_UPPER[barrel_index]) == LOW;
+  return digitalRead(SENSORS_UPPER[barrel_index]) == HIGH;  // Upper sensor: HIGH = water present (LOW when no water)
 }
 bool water_below_lower_level(int barrel_index) {
-  return digitalRead(SENSORS_LOWER[barrel_index]) == HIGH;
+  return digitalRead(SENSORS_LOWER[barrel_index]) == HIGH;  // Lower sensor: HIGH = no water (water below level)
 }
 
 void open_valve(int valve) { digitalWrite(valve, LOW); }  // LOW triggers relay (opens valve)
@@ -115,14 +115,14 @@ void print_status() {
   String status = "";
   for (int i = 0; i < NUM_BARRELS; i++) {
     int pressure = analogRead(SENSORS_PRESSURE[i]);
-    bool upper_triggered = (digitalRead(SENSORS_UPPER[i]) == LOW);
-    bool lower_triggered = (digitalRead(SENSORS_LOWER[i]) == LOW);
+    bool upper_sensor_raw = digitalRead(SENSORS_UPPER[i]);  // Upper: LOW=no water, HIGH=water present
+    bool lower_sensor_raw = digitalRead(SENSORS_LOWER[i]);  // Lower: HIGH=no water, LOW=water present
 
     if (i > 0) status += " | ";
     status += "Barrel" + String(i) + ":" + String(state_name(barrel_states[i]));
     status += " (P:" + String(pressure);
-    status += " U:" + String(upper_triggered ? "1" : "0");
-    status += " L:" + String(lower_triggered ? "1" : "0") + ")";
+    status += " U:" + String(upper_sensor_raw ? "1" : "0");
+    status += " L:" + String(lower_sensor_raw ? "1" : "0") + ")";
   }
   log(status);
 }
