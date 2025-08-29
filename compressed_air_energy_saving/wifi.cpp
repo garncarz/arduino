@@ -33,13 +33,24 @@ void setup_wifi() {
   if (WiFi.status() == WL_CONNECTED) {
     wifi_connected = true;
     udp.begin(UDP_PORT);  // Single port for both logs and commands
+
+    // Calculate subnet broadcast address
+    IPAddress ip = WiFi.localIP();
+    IPAddress subnet = WiFi.subnetMask();
+    IPAddress broadcast_ip;
+
+    // Calculate broadcast: IP | (~subnet)
+    for (int i = 0; i < 4; i++) {
+      broadcast_ip[i] = ip[i] | (~subnet[i]);
+    }
+
     Serial.println();
-    Serial.print("WiFi connected! IP: ");
-    Serial.println(WiFi.localIP());
-    Serial.print("UDP port ");
-    Serial.print(UDP_PORT);
-    Serial.println(" - logs broadcast, commands received");
+    Serial.println("WiFi connected! IP: " + ip.toString());
+    Serial.println("Subnet mask: " + subnet.toString());
+    Serial.println("Broadcast IP: " + broadcast_ip.toString());
+    Serial.println("UDP port " + String(UDP_PORT) + " - logs broadcast, commands received");
     Serial.println("Command format: CMD <STATE> <BARREL> or MODE <AUTO/MANUAL>");
+    Serial.println("Send commands to: " + broadcast_ip.toString() + ":" + UDP_PORT + " or " + ip.toString() + ":" + UDP_PORT);
   } else {
     Serial.println();
     Serial.println("WiFi connection failed - continuing with Serial only");
