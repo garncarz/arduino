@@ -12,8 +12,13 @@ void process_command(String command) {
     mode_str.trim();
 
     if (mode_str == "MANUAL") {
+      // Preserve current barrel states when switching to manual mode
+      for (int i = 0; i < NUM_BARRELS; i++) {
+        manual_states[i] = barrel_states[i];
+      }
       manual_mode = true;
       log("System set to MANUAL mode - automatic logic disabled");
+      log("Current barrel states preserved for manual control");
       log("Use CMD <STATE> <BARREL> to control individual barrels");
     } else if (mode_str == "AUTO") {
       manual_mode = false;
@@ -27,6 +32,10 @@ void process_command(String command) {
   if (command.startsWith("CMD ")) {
     // Automatically switch to manual mode if not already in manual mode
     if (!manual_mode) {
+      // Preserve current barrel states when auto-switching to manual
+      for (int i = 0; i < NUM_BARRELS; i++) {
+        manual_states[i] = barrel_states[i];
+      }
       manual_mode = true;
       log("Auto-switching to MANUAL mode for direct barrel control");
     }

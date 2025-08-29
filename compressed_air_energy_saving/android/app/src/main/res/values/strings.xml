@@ -1,0 +1,62 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Compressed Air Controller</string>
+    
+    <!-- Connection Status -->
+    <string name="connection_status">Connection Status</string>
+    <string name="status_connected">Connected</string>
+    <string name="status_disconnected">Disconnected</string>
+    <string name="status_searching">Searching…</string>
+    <string name="arduino_ip">Arduino IP: %s</string>
+    <string name="arduino_ip_unknown">Arduino IP: Unknown</string>
+    
+    <!-- System Control -->
+    <string name="system_control">System Control</string>
+    <string name="mode_auto">AUTO</string>
+    <string name="mode_manual">MANUAL</string>
+    <string name="switch_to_auto">Switch to AUTO</string>
+    <string name="switch_to_manual">Switch to MANUAL</string>
+    <string name="last_update">Last Update: %s</string>
+    <string name="last_update_never">Last Update: Never</string>
+    
+    <!-- Barrel Status -->
+    <string name="barrel_status">Barrel Status</string>
+    <string name="barrel_name">Barrel %d</string>
+    <string name="pressure_reading">Pressure</string>
+    <string name="upper_sensor">Upper</string>
+    <string name="lower_sensor">Lower</string>
+    <string name="sensor_wet">WET</string>
+    <string name="sensor_dry">DRY</string>
+    <string name="sensor_unknown">--</string>
+    
+    <!-- Manual Control -->
+    <string name="manual_control">Manual Control</string>
+    <string name="barrel_select">Select Barrel:</string>
+    <string name="set_intake">INTAKE</string>
+    <string name="set_compression">COMPRESSION</string>
+    <string name="set_release">RELEASE</string>
+    <string name="set_idle">IDLE</string>
+    
+    <!-- Live Log -->
+    <string name="live_log">Live Log</string>
+    <string name="clear_log">Clear Log</string>
+    
+    <!-- Commands -->
+    <string name="cmd_auto">AUTO</string>
+    <string name="cmd_manual">MANUAL</string>
+    <string name="cmd_intake">INTAKE</string>
+    <string name="cmd_compression">COMPRESSION</string>
+    <string name="cmd_release">RELEASE</string>
+    <string name="cmd_idle">IDLE</string>
+    
+    <!-- Errors -->
+    <string name="error_send_command">Failed to send command</string>
+    <string name="error_network">Network error</string>
+    <string name="error_permission">Network permission required</string>
+    
+    <!-- Barrel States -->
+    <string name="state_intake">INTAKE</string>
+    <string name="state_compression">COMPRESSION</string>
+    <string name="state_release">RELEASE</string>
+    <string name="state_idle">IDLE</string>
+</resources>
