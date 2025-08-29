@@ -52,7 +52,7 @@ jobs:
 
         # Create temp directory matching the .ino file name
         mkdir -p /tmp/compressed_air_energy_saving
-        cp compressed_air_energy_saving.ino logic.cpp logic.h constants.h /tmp/compressed_air_energy_saving/
+        cp *.ino *.cpp *.h /tmp/compressed_air_energy_saving/
 
         echo "Files to be compiled for Arduino:"
         ls -la /tmp/compressed_air_energy_saving/
