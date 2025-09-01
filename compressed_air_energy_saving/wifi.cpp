@@ -24,33 +24,51 @@ void setup_wifi() {
   Serial.print("Connecting to WiFi");
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
 
+  // First wait for WiFi connection
   for (int attempts = 0; attempts < 20 && WiFi.status() != WL_CONNECTED; attempts++) {
     delay(500);
     Serial.print(".");
-    Serial.flush();  // Ensure dots appear immediately
+    Serial.flush();
   }
 
   if (WiFi.status() == WL_CONNECTED) {
-    wifi_connected = true;
-    udp.begin(UDP_PORT);  // Single port for both logs and commands
+    Serial.print("Connected, waiting for IP");
 
-    // Calculate subnet broadcast address
-    IPAddress ip = WiFi.localIP();
-    IPAddress subnet = WiFi.subnetMask();
-    IPAddress broadcast_ip;
-
-    // Calculate broadcast: IP | (~subnet)
-    for (int i = 0; i < 4; i++) {
-      broadcast_ip[i] = ip[i] | (~subnet[i]);
+    // Then wait for valid IP assignment
+    for (int ip_attempts = 0; ip_attempts < 10; ip_attempts++) {
+      IPAddress ip = WiFi.localIP();
+      if (ip != IPAddress(0, 0, 0, 0)) {
+        wifi_connected = true;
+        break;
+      }
+      delay(500);
+      Serial.print(".");
+      Serial.flush();
     }
 
-    Serial.println();
-    Serial.println("WiFi connected! IP: " + ip.toString());
-    Serial.println("Subnet mask: " + subnet.toString());
-    Serial.println("Broadcast IP: " + broadcast_ip.toString());
-    Serial.println("UDP port " + String(UDP_PORT) + " - logs broadcast, commands received");
-    Serial.println("Command format: CMD <STATE> <BARREL> or MODE <AUTO/MANUAL>");
-    Serial.println("Send commands to: " + broadcast_ip.toString() + ":" + UDP_PORT + " or " + ip.toString() + ":" + UDP_PORT);
+    if (wifi_connected) {
+      udp.begin(UDP_PORT);  // Single port for both logs and commands
+
+      // Calculate subnet broadcast address
+      IPAddress ip = WiFi.localIP();
+      IPAddress subnet = WiFi.subnetMask();
+      IPAddress broadcast_ip;
+
+      // Calculate broadcast: IP | (~subnet)
+      for (int i = 0; i < 4; i++) {
+        broadcast_ip[i] = ip[i] | (~subnet[i]);
+      }
+
+      Serial.println();
+      Serial.println("WiFi connected! IP: " + ip.toString());
+      Serial.println("Subnet mask: " + subnet.toString());
+      Serial.println("Broadcast IP: " + broadcast_ip.toString());
+      Serial.println("UDP port " + String(UDP_PORT) + " - logs broadcast, commands received");
+      Serial.println("Command format: CMD <STATE> <BARREL> or MODE <AUTO/MANUAL>");
+      Serial.println("Send commands to: " + broadcast_ip.toString() + ":" + UDP_PORT + " or " + ip.toString() + ":" + UDP_PORT);
+    } else {
+      Serial.println("\nIP assignment failed - got 0.0.0.0");
+    }
   } else {
     Serial.println();
     Serial.println("WiFi connection failed - continuing with Serial only");
