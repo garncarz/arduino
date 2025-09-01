@@ -1,5 +1,6 @@
 #ifdef ARDUINO
 #include <Arduino.h>
+#include "commands.h"  // For logger function declaration
 #endif
 #include "constants.h"
 #include "logic.h"
@@ -9,6 +10,8 @@
 extern bool mock_pressurized[];
 extern bool mock_water_below[];
 extern bool mock_water_upper[];
+// Forward declaration for test environment
+void logger(const char* msg);
 #endif
 
 // Define the number of barrels (can be changed dynamically)
@@ -373,8 +376,8 @@ void logic() {
  */
 void assess_startup_state() {
 #ifdef ARDUINO
-  log("=== STARTUP ASSESSMENT ===");
-  log("System reset detected - assessing barrel states from sensors...");
+  logger("=== STARTUP ASSESSMENT ===");
+  logger("System reset detected - assessing barrel states from sensors...");
 
   // First, ensure all valves are closed for safety
   for (int i = 0; i < NUM_BARRELS; i++) {
@@ -392,7 +395,7 @@ void assess_startup_state() {
   }
 
   log_startup_assessment();
-  log("=== STARTUP ASSESSMENT COMPLETE ===");
+  logger("=== STARTUP ASSESSMENT COMPLETE ===");
 #else
   // Test environment version
   for (int i = 0; i < NUM_BARRELS; i++) {
@@ -417,7 +420,7 @@ State determine_barrel_state_from_sensors(int barrel_index) {
 
   // Log sensor readings for debugging
   int pressure_raw = analogRead(SENSORS_PRESSURE[barrel_index]);
-  log("Barrel" + String(barrel_index) + " sensors: P=" + String(pressure_raw) +
+  logger("Barrel" + String(barrel_index) + " sensors: P=" + String(pressure_raw) +
       " (" + (has_pressure ? "HIGH" : "LOW") +
       ") U=" + (water_at_upper ? "WATER" : "NO_WATER") +
       " L=" + (water_below_lower ? "NO_WATER" : "WATER"));
@@ -484,7 +487,7 @@ void safe_barrel_recovery(int barrel_index, State assessed_state) {
   barrel_states[barrel_index] = assessed_state;
 
 #ifdef ARDUINO
-  log("Barrel" + String(barrel_index) + " assessed as: " + String(state_name(assessed_state)));
+  logger("Barrel" + String(barrel_index) + " assessed as: " + String(state_name(assessed_state)));
 
   // Set appropriate valve configuration for the assessed state
   switch (assessed_state) {
@@ -493,7 +496,7 @@ void safe_barrel_recovery(int barrel_index, State assessed_state) {
       open_valve(VALVES_INTAKE[barrel_index]);
       close_valve(VALVES_EXHAUST[barrel_index]);
       close_valve(VALVES_TO_TURBINE[barrel_index]);
-      log("Barrel" + String(barrel_index) + " recovery: Intake valve opened");
+      logger("Barrel" + String(barrel_index) + " recovery: Intake valve opened");
       break;
 
     case WORK:
@@ -502,7 +505,7 @@ void safe_barrel_recovery(int barrel_index, State assessed_state) {
       close_valve(VALVES_INTAKE[barrel_index]);
       close_valve(VALVES_EXHAUST[barrel_index]);
       close_valve(VALVES_TO_TURBINE[barrel_index]);
-      log("Barrel" + String(barrel_index) + " recovery: WORK->WAIT_FOR_WORK for safety");
+      logger("Barrel" + String(barrel_index) + " recovery: WORK->WAIT_FOR_WORK for safety");
       break;
 
     case EXHAUST:
@@ -510,7 +513,7 @@ void safe_barrel_recovery(int barrel_index, State assessed_state) {
       close_valve(VALVES_INTAKE[barrel_index]);
       open_valve(VALVES_EXHAUST[barrel_index]);
       close_valve(VALVES_TO_TURBINE[barrel_index]);
-      log("Barrel" + String(barrel_index) + " recovery: Exhaust valve opened");
+      logger("Barrel" + String(barrel_index) + " recovery: Exhaust valve opened");
       break;
 
     case WAIT_FOR_INTAKE:
@@ -519,7 +522,7 @@ void safe_barrel_recovery(int barrel_index, State assessed_state) {
       close_valve(VALVES_INTAKE[barrel_index]);
       close_valve(VALVES_EXHAUST[barrel_index]);
       close_valve(VALVES_TO_TURBINE[barrel_index]);
-      log("Barrel" + String(barrel_index) + " recovery: All valves closed, waiting");
+      logger("Barrel" + String(barrel_index) + " recovery: All valves closed, waiting");
       break;
   }
 #else
@@ -543,7 +546,6 @@ void log_startup_assessment() {
     if (i > 0) assessment += " | ";
     assessment += "Barrel" + String(i) + ":" + String(state_name(barrel_states[i]));
   }
-  log(assessment.c_str());
-  print_valve_states();
+  logger(assessment.c_str());
 #endif
 }

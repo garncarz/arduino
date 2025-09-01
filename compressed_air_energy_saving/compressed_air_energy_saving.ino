@@ -21,7 +21,7 @@ void close_valve(int valve) { digitalWrite(valve, HIGH); } // HIGH releases rela
 
 #ifndef ARDUINO_UNOR4_WIFI
 // Fallback log function for non-WiFi boards
-void log(const String& message) {
+void logger(const String& message) {
   Serial.println(message);
 }
 #endif
@@ -30,7 +30,7 @@ void log(const String& message) {
 void process_serial_commands() {
   if (Serial.available()) {
     String command = Serial.readStringUntil('\n');
-    log("Serial Command received: " + command);
+    logger("Serial Command received: " + command);
     process_command(command);
   }
 }
@@ -61,7 +61,7 @@ void setup() {
   // Perform startup assessment to recover from potential reset
   assess_startup_state();
 
-  log("Compressed Air Energy System Started");
+  logger("Compressed Air Energy System Started");
 }
 
 void print_status() {
@@ -77,12 +77,12 @@ void print_status() {
     status += " U:" + String(upper_sensor_raw ? "1" : "0");
     status += " L:" + String(lower_sensor_raw ? "1" : "0") + ")";
   }
-  log(status);
+  logger(status);
 }
 
 void print_timing_stats_arduino() {
-  log("");
-  log("=== TIMING SUMMARY ===");
+  logger("");
+  logger("=== TIMING SUMMARY ===");
   for (int i = 0; i < NUM_BARRELS; i++) {
     unsigned long avg_intake = get_average_duration(i, INTAKE);
     unsigned long avg_work = get_average_duration(i, WORK);
@@ -97,14 +97,14 @@ void print_timing_stats_arduino() {
       if (avg_exhaust > 0) timing += "EXHAUST=" + String(avg_exhaust) + "ms ";
       if (avg_wait_intake > 0) timing += "WAIT_INTAKE=" + String(avg_wait_intake) + "ms ";
       if (avg_wait_work > 0) timing += "WAIT_WORK=" + String(avg_wait_work) + "ms ";
-      log(timing);
+      logger(timing);
     }
   }
-  log("");
+  logger("");
 }
 
 void print_timing_predictions() {
-  log("=== TIMING PREDICTIONS ===");
+  logger("=== TIMING PREDICTIONS ===");
   for (int i = 0; i < NUM_BARRELS; i++) {
     unsigned long avg_intake = get_average_duration(i, INTAKE);
     unsigned long avg_work = get_average_duration(i, WORK);
@@ -114,10 +114,10 @@ void print_timing_predictions() {
     if (cycle_time > 0) {
       String prediction = "Barrel" + String(i) + " cycle: " + String(cycle_time) +
                          "ms, start INTAKE " + String(avg_work + avg_exhaust) + "ms early";
-      log(prediction);
+      logger(prediction);
     }
   }
-  log("");
+  logger("");
 }// Call this function periodically (e.g., every 30 seconds) to print timing data
 unsigned long last_timing_print = 0;
 void periodic_timing_report() {

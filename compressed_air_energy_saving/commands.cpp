@@ -17,14 +17,14 @@ void process_command(String command) {
         manual_states[i] = barrel_states[i];
       }
       manual_mode = true;
-      log("System set to MANUAL mode - automatic logic disabled");
-      log("Current barrel states preserved for manual control");
-      log("Use CMD <STATE> <BARREL> to control individual barrels");
+      logger("System set to MANUAL mode - automatic logic disabled");
+      logger("Current barrel states preserved for manual control");
+      logger("Use CMD <STATE> <BARREL> to control individual barrels");
     } else if (mode_str == "AUTO") {
       manual_mode = false;
-      log("System set to AUTO mode - automatic logic enabled");
+      logger("System set to AUTO mode - automatic logic enabled");
     } else {
-      log("ERROR: Invalid mode. Use: MODE AUTO or MODE MANUAL");
+      logger("ERROR: Invalid mode. Use: MODE AUTO or MODE MANUAL");
     }
     return;
   }
@@ -37,14 +37,14 @@ void process_command(String command) {
         manual_states[i] = barrel_states[i];
       }
       manual_mode = true;
-      log("Auto-switching to MANUAL mode for direct barrel control");
+      logger("Auto-switching to MANUAL mode for direct barrel control");
     }
 
     String params = command.substring(4);  // Remove "CMD "
     int firstSpace = params.indexOf(' ');
 
     if (firstSpace == -1) {
-      log("ERROR: Invalid command format. Use: CMD <STATE> <BARREL>");
+      logger("ERROR: Invalid command format. Use: CMD <STATE> <BARREL>");
       return;
     }
 
@@ -54,7 +54,7 @@ void process_command(String command) {
 
     // Validate barrel number
     if (barrel_num < 0 || barrel_num >= NUM_BARRELS) {
-      log("ERROR: Invalid barrel number. Use 0-" + String(NUM_BARRELS-1));
+      logger("ERROR: Invalid barrel number. Use 0-" + String(NUM_BARRELS-1));
       return;
     }
 
@@ -76,36 +76,36 @@ void process_command(String command) {
     }
 
     if (!valid_state) {
-      log("ERROR: Invalid state. Use: INTAKE, WORK, EXHAUST, WAIT_INTAKE, WAIT_WORK");
+      logger("ERROR: Invalid state. Use: INTAKE, WORK, EXHAUST, WAIT_INTAKE, WAIT_WORK");
       return;
     }
 
     // Apply manual state
     manual_states[barrel_num] = new_state;
-    log("Manual command: Barrel" + String(barrel_num) + " set to " + String(state_name(new_state)));
+    logger("Manual command: Barrel" + String(barrel_num) + " set to " + String(state_name(new_state)));
 
   } else if (command == "STATUS") {
-    log("=== SYSTEM STATUS ===");
+    logger("=== SYSTEM STATUS ===");
     if (manual_mode) {
-      log("Mode: MANUAL");
+      logger("Mode: MANUAL");
       for (int i = 0; i < NUM_BARRELS; i++) {
-        log("Barrel" + String(i) + ": " + String(state_name(manual_states[i])) + " (manual)");
+        logger("Barrel" + String(i) + ": " + String(state_name(manual_states[i])) + " (manual)");
       }
     } else {
-      log("Mode: AUTO");
+      logger("Mode: AUTO");
       for (int i = 0; i < NUM_BARRELS; i++) {
-        log("Barrel" + String(i) + ": " + String(state_name(barrel_states[i])) + " (auto)");
+        logger("Barrel" + String(i) + ": " + String(state_name(barrel_states[i])) + " (auto)");
       }
     }
   } else if (command == "HELP") {
-    log("=== AVAILABLE COMMANDS ===");
-    log("MODE <AUTO|MANUAL> - Switch between automatic and manual control");
-    log("CMD <STATE> <BARREL> - Set barrel state (auto-switches to manual mode)");
-    log("  States: INTAKE, WORK, EXHAUST, WAIT_INTAKE, WAIT_WORK");
-    log("  Example: CMD INTAKE 0");
-    log("STATUS - Show current system and barrel status");
-    log("HELP - Show this help");
+    logger("=== AVAILABLE COMMANDS ===");
+    logger("MODE <AUTO|MANUAL> - Switch between automatic and manual control");
+    logger("CMD <STATE> <BARREL> - Set barrel state (auto-switches to manual mode)");
+    logger("  States: INTAKE, WORK, EXHAUST, WAIT_INTAKE, WAIT_WORK");
+    logger("  Example: CMD INTAKE 0");
+    logger("STATUS - Show current system and barrel status");
+    logger("HELP - Show this help");
   } else {
-    log("Unknown command: " + command + ". Type HELP for available commands.");
+    logger("Unknown command: " + command + ". Type HELP for available commands.");
   }
 }

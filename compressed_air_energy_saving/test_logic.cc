@@ -12,11 +12,11 @@ unsigned long millis() { return mock_time; }
 void advance_time(unsigned long ms) { mock_time += ms; }
 
 // Mock Arduino-specific functions for testing
-void log(const char* msg) {
+void logger(const char* msg) {
     std::cout << "[LOG] " << msg << std::endl;
 }
 
-void log(std::string msg) {
+void logger(std::string msg) {
     std::cout << "[LOG] " << msg << std::endl;
 }
 

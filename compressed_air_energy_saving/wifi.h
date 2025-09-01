@@ -7,7 +7,7 @@
 void setup_wifi();
 void process_udp_commands();
 bool is_wifi_connected();
-void log(const String& message);  // WiFi version of log
+void logger(const String& message);  // WiFi version of log
 #endif
 
 #endif // WIFI_H

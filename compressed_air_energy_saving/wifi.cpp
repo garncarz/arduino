@@ -58,7 +58,7 @@ void setup_wifi() {
 }
 
 // Send log message via both Serial and WiFi UDP
-void log(const String& message) {
+void logger(const String& message) {
   // Always print to Serial
   Serial.println(message);
 
@@ -79,7 +79,7 @@ void process_udp_commands() {
     buffer[len] = 0;  // Null terminate
 
     String command = String(buffer);
-    log("UDP Command received: " + command);
+    logger("UDP Command received: " + command);
     process_command(command);
   }
 }
