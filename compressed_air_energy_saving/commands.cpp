@@ -17,14 +17,14 @@ void process_command(String command) {
         manual_states[i] = barrel_states[i];
       }
       manual_mode = true;
-      logger("System set to MANUAL mode - automatic logic disabled");
-      logger("Current barrel states preserved for manual control");
-      logger("Use CMD <STATE> <BARREL> to control individual barrels");
+      logger(F("System set to MANUAL mode - automatic logic disabled"));
+      logger(F("Current barrel states preserved for manual control"));
+      logger(F("Use CMD <STATE> <BARREL> to control individual barrels"));
     } else if (mode_str == "AUTO") {
       manual_mode = false;
-      logger("System set to AUTO mode - automatic logic enabled");
+      logger(F("System set to AUTO mode - automatic logic enabled"));
     } else {
-      logger("ERROR: Invalid mode. Use: MODE AUTO or MODE MANUAL");
+      logger(F("ERROR: Invalid mode. Use: MODE AUTO or MODE MANUAL"));
     }
     return;
   }
@@ -37,14 +37,14 @@ void process_command(String command) {
         manual_states[i] = barrel_states[i];
       }
       manual_mode = true;
-      logger("Auto-switching to MANUAL mode for direct barrel control");
+      logger(F("Auto-switching to MANUAL mode for direct barrel control"));
     }
 
     String params = command.substring(4);  // Remove "CMD "
     int firstSpace = params.indexOf(' ');
 
     if (firstSpace == -1) {
-      logger("ERROR: Invalid command format. Use: CMD <STATE> <BARREL>");
+      logger(F("ERROR: Invalid command format. Use: CMD <STATE> <BARREL>"));
       return;
     }
 
@@ -76,7 +76,7 @@ void process_command(String command) {
     }
 
     if (!valid_state) {
-      logger("ERROR: Invalid state. Use: INTAKE, WORK, EXHAUST, WAIT_INTAKE, WAIT_WORK");
+      logger(F("ERROR: Invalid state. Use: INTAKE, WORK, EXHAUST, WAIT_INTAKE, WAIT_WORK"));
       return;
     }
 
@@ -85,26 +85,26 @@ void process_command(String command) {
     logger("Manual command: Barrel" + String(barrel_num) + " set to " + String(state_name(new_state)));
 
   } else if (command == "STATUS") {
-    logger("=== SYSTEM STATUS ===");
+    logger(F("=== SYSTEM STATUS ==="));
     if (manual_mode) {
-      logger("Mode: MANUAL");
+      logger(F("Mode: MANUAL"));
       for (int i = 0; i < NUM_BARRELS; i++) {
         logger("Barrel" + String(i) + ": " + String(state_name(manual_states[i])) + " (manual)");
       }
     } else {
-      logger("Mode: AUTO");
+      logger(F("Mode: AUTO"));
       for (int i = 0; i < NUM_BARRELS; i++) {
         logger("Barrel" + String(i) + ": " + String(state_name(barrel_states[i])) + " (auto)");
       }
     }
   } else if (command == "HELP") {
-    logger("=== AVAILABLE COMMANDS ===");
-    logger("MODE <AUTO|MANUAL> - Switch between automatic and manual control");
-    logger("CMD <STATE> <BARREL> - Set barrel state (auto-switches to manual mode)");
-    logger("  States: INTAKE, WORK, EXHAUST, WAIT_INTAKE, WAIT_WORK");
-    logger("  Example: CMD INTAKE 0");
-    logger("STATUS - Show current system and barrel status");
-    logger("HELP - Show this help");
+    logger(F("=== AVAILABLE COMMANDS ==="));
+    logger(F("MODE <AUTO|MANUAL> - Switch between automatic and manual control"));
+    logger(F("CMD <STATE> <BARREL> - Set barrel state (auto-switches to manual mode)"));
+    logger(F("  States: INTAKE, WORK, EXHAUST, WAIT_INTAKE, WAIT_WORK"));
+    logger(F("  Example: CMD INTAKE 0"));
+    logger(F("STATUS - Show current system and barrel status"));
+    logger(F("HELP - Show this help"));
   } else {
     logger("Unknown command: " + command + ". Type HELP for available commands.");
   }

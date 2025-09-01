@@ -31,11 +31,6 @@ int analogRead(int pin) {
     return (pin % 4) * 256; // 0, 256, 512, 768 for different pins
 }
 
-void print_valve_states() {
-    // Mock implementation for testing
-    std::cout << "[VALVES] Current valve states printed" << std::endl;
-}
-
 bool mock_pressurized[MAX_BARRELS] = {false};
 bool mock_water_below[MAX_BARRELS] = {false};
 bool mock_water_upper[MAX_BARRELS] = {false};
@@ -535,7 +530,6 @@ void test_startup_assessment() {
     mock_water_upper[1] = false;
 
     assess_startup_state();
-    print_valve_states();
 
     if (barrel_states[0] == WAIT_FOR_INTAKE && barrel_states[1] == WAIT_FOR_INTAKE) {
         std::cout << "✓ Empty barrels correctly assessed as WAIT_FOR_INTAKE" << std::endl;
