@@ -44,28 +44,67 @@ jobs:
         echo "=== Building and Testing Compressed Air Energy Saving System ==="
         make test
 
-    - name: Verify Arduino compatibility (actual compilation)
+    - name: Verify Arduino R3 compatibility (with conditional compilation)
       working-directory: compressed_air_energy_saving
       run: |
-        echo "=== Arduino Compatibility Check ==="
-        echo "Compiling for Arduino Uno (ATmega328P)..."
+        echo "=== Arduino R3 Compatibility Check (Logic Only) ==="
+        echo "Compiling for Arduino Uno (ATmega328P) with WiFi features disabled..."
 
-        # Create temp directory matching the .ino file name
-        mkdir -p /tmp/compressed_air_energy_saving
-        cp *.ino *.cpp *.h /tmp/compressed_air_energy_saving/
+        # Create temp directory matching Arduino IDE requirements (directory name = .ino name)
+        mkdir -p /tmp/arduino-r3/compressed_air_energy_saving
+        
+        # Copy ALL files (mimic Arduino IDE behavior)
+        cp *.ino *.cpp *.h /tmp/arduino-r3/compressed_air_energy_saving/
 
-        echo "Files to be compiled for Arduino:"
-        ls -la /tmp/compressed_air_energy_saving/
+        echo "Files for R3 compilation:"
+        ls -la /tmp/arduino-r3/compressed_air_energy_saving/
 
-        cd /tmp/compressed_air_energy_saving
+        cd /tmp/arduino-r3/compressed_air_energy_saving
 
-        # Attempt real Arduino compilation
+        # Test R3 compatibility with conditional compilation
+        # The code should use #ifdef ARDUINO_UNOR4_WIFI to disable WiFi features on R3
         if arduino-cli compile --fqbn arduino:avr:uno compressed_air_energy_saving.ino; then
-          echo "✅ Arduino compilation successful!"
+          echo "✅ Arduino R3 (Uno) compilation successful with conditional compilation!"
         else
-          echo "❌ Arduino compilation failed!"
-          echo "This indicates incompatibility with Arduino environment."
+          echo "❌ Arduino R3 compilation failed!"
+          echo "Memory usage too high for R3. WiFi features need conditional compilation."
           exit 1
+        fi
+
+    - name: Verify Arduino R4 WiFi compatibility (full system)
+      working-directory: compressed_air_energy_saving
+      run: |
+        echo "=== Arduino R4 WiFi Compatibility Check (Full System) ==="
+        echo "Compiling full system for Arduino Uno R4 WiFi..."
+
+        # Create temp directory matching Arduino IDE requirements (directory name = .ino name)  
+        mkdir -p /tmp/arduino-r4/compressed_air_energy_saving
+        
+        # Copy all source files
+        cp *.ino *.cpp *.h /tmp/arduino-r4/compressed_air_energy_saving/
+
+        echo "Files for R4 WiFi compilation:"
+        ls -la /tmp/arduino-r4/compressed_air_energy_saving/
+
+        cd /tmp/arduino-r4/compressed_air_energy_saving
+
+        # Test R4 WiFi compatibility
+        if arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi compressed_air_energy_saving.ino; then
+          echo "✅ Arduino R4 WiFi full system compilation successful!"
+        else
+          echo "❌ Arduino R4 WiFi compilation failed!"
+          echo "Attempting to install Arduino R4 WiFi board package..."
+          arduino-cli core update-index
+          arduino-cli core install arduino:renesas_uno
+          
+          # Retry after installing R4 support
+          if arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi compressed_air_energy_saving.ino; then
+            echo "✅ Arduino R4 WiFi compilation successful after installing board package!"
+          else
+            echo "❌ Arduino R4 WiFi compilation still failing!"
+            echo "This may indicate memory usage issues or missing dependencies"
+            exit 1
+          fi
         fi
 
     - name: Generate test summary
@@ -76,6 +115,9 @@ jobs:
         echo "✅ Timing measurement system validated"
         echo "✅ State machine transitions verified"
         echo "✅ Continuous energy production confirmed"
-        echo "✅ Arduino compilation compatibility verified"
+        echo "✅ Arduino R3 (Uno) compatibility verified with reduced memory usage"
+        echo "✅ Arduino R4 WiFi full system compatibility verified"
         echo ""
         echo "System ready for Arduino deployment! 🚀"
+        echo "- Deploy to Arduino R3 Uno: Core logic + Serial commands (reduced timing history)"
+        echo "- Deploy to Arduino R4 WiFi: Full system with WiFi + Android app (full timing history)"

@@ -17,9 +17,16 @@ State manual_states[MAX_BARRELS] = {WAIT_FOR_INTAKE, WAIT_FOR_INTAKE, WAIT_FOR_I
 // Initialize barrel timers - track when each barrel entered its current state
 unsigned long barrel_timers[MAX_BARRELS] = {0, 0, 0, 0};
 
+// Timing system - scale history size based on available memory
+#ifdef ARDUINO_UNOR4_WIFI
+  #define TIMING_HISTORY_SIZE 10  // R4 WiFi: 32KB RAM - full history
+#else
+  #define TIMING_HISTORY_SIZE 3   // R3 Uno: 2KB RAM - minimal history
+#endif
+
 // Timing data using simple arrays for Arduino compatibility
 // [barrel][state][history_index] - state index: 0=INTAKE, 1=WORK, 2=EXHAUST, 3=WAIT_FOR_INTAKE, 4=WAIT_FOR_WORK
-unsigned long timing_history[MAX_BARRELS][5][10];
+unsigned long timing_history[MAX_BARRELS][5][TIMING_HISTORY_SIZE];
 unsigned long current_durations[MAX_BARRELS][5]; // Current cycle durations
 int history_index[MAX_BARRELS] = {0, 0, 0, 0}; // Current index in circular buffer
 
@@ -27,7 +34,7 @@ int history_index[MAX_BARRELS] = {0, 0, 0, 0}; // Current index in circular buff
 void init_timing_system() {
   for (int i = 0; i < MAX_BARRELS; i++) {
     for (int state = 0; state < 5; state++) {
-      for (int j = 0; j < 10; j++) {
+      for (int j = 0; j < TIMING_HISTORY_SIZE; j++) {
         timing_history[i][state][j] = 0;
       }
       current_durations[i][state] = 0;
@@ -50,7 +57,7 @@ void record_state_duration(int barrel_index, State from_state, unsigned long dur
   timing_history[barrel_index][from_state][idx] = duration;
 
   // Advance circular buffer index (shared across all states for this barrel)
-  history_index[barrel_index] = (idx + 1) % 10;
+  history_index[barrel_index] = (idx + 1) % TIMING_HISTORY_SIZE;
 }
 
 // Calculate average duration for a state across recent history
@@ -61,7 +68,7 @@ unsigned long get_average_duration(int barrel_index, State state) {
   int count = 0;
 
   // Use enum value directly as array index
-  for (int i = 0; i < 10; i++) {
+  for (int i = 0; i < TIMING_HISTORY_SIZE; i++) {
     if (timing_history[barrel_index][state][i] > 0) {
       total += timing_history[barrel_index][state][i];
       count++;
