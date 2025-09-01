@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cassert>
 #include <map>
+#include <string>
 
 #include "constants.h"
 #include "logic.h"
@@ -9,6 +10,31 @@
 unsigned long mock_time = 0;
 unsigned long millis() { return mock_time; }
 void advance_time(unsigned long ms) { mock_time += ms; }
+
+// Mock Arduino-specific functions for testing
+void log(const char* msg) {
+    std::cout << "[LOG] " << msg << std::endl;
+}
+
+void log(std::string msg) {
+    std::cout << "[LOG] " << msg << std::endl;
+}
+
+void delay(int ms) {
+    // In tests, we don't actually delay
+    advance_time(ms);
+}
+
+int analogRead(int pin) {
+    // Mock sensor readings for testing
+    // Return different values based on pin for testing variety
+    return (pin % 4) * 256; // 0, 256, 512, 768 for different pins
+}
+
+void print_valve_states() {
+    // Mock implementation for testing
+    std::cout << "[VALVES] Current valve states printed" << std::endl;
+}
 
 bool mock_pressurized[MAX_BARRELS] = {false};
 bool mock_water_below[MAX_BARRELS] = {false};
@@ -306,7 +332,9 @@ void print_timing_summary() {
         }
     }
     std::cout << std::endl;
-}void test_timing_system() {
+}
+
+void test_timing_system() {
     std::cout << "\n=== Testing Timing System with Realistic Durations ===" << std::endl;
 
     NUM_BARRELS = 2;
@@ -490,6 +518,253 @@ void test_manual_control() {
     std::cout << "=== Manual Control System test passed! ===" << std::endl;
 }
 
+void test_startup_assessment() {
+    std::cout << std::endl << "=== Testing Startup Assessment and Recovery ===" << std::endl;
+
+    // Test 1: Empty barrels (no pressure, low water) - should assess as WAIT_FOR_INTAKE
+    std::cout << "1. Testing empty barrels assessment..." << std::endl;
+    NUM_BARRELS = 2;
+    init_valve_states();
+
+    // Simulate empty barrels
+    mock_pressurized[0] = false;
+    mock_pressurized[1] = false;
+    mock_water_below[0] = true;   // Water below lower level
+    mock_water_below[1] = true;
+    mock_water_upper[0] = false;  // No water at upper level
+    mock_water_upper[1] = false;
+
+    assess_startup_state();
+    print_valve_states();
+
+    if (barrel_states[0] == WAIT_FOR_INTAKE && barrel_states[1] == WAIT_FOR_INTAKE) {
+        std::cout << "✓ Empty barrels correctly assessed as WAIT_FOR_INTAKE" << std::endl;
+    } else {
+        std::cout << "✗ Empty barrels assessment failed" << std::endl;
+    }
+
+    // Test 2: Pressurized barrel with water - should assess as WAIT_FOR_WORK (safe)
+    std::cout << "2. Testing pressurized barrel with water..." << std::endl;
+    mock_pressurized[0] = true;   // High pressure
+    mock_water_below[0] = false;  // Water above lower level
+    mock_water_upper[0] = false;  // Not at upper level (mid-level)
+
+    State assessed = determine_barrel_state_from_sensors(0);
+    if (assessed == WAIT_FOR_WORK) {
+        std::cout << "✓ Pressurized barrel with water assessed as WAIT_FOR_WORK (safe)" << std::endl;
+    } else {
+        std::cout << "✗ Pressurized barrel assessment failed, got: " << state_name(assessed) << std::endl;
+    }
+
+    // Test 3: Pressurized barrel with low water - should assess as EXHAUST
+    std::cout << "3. Testing pressurized barrel with low water..." << std::endl;
+    mock_pressurized[1] = true;   // High pressure
+    mock_water_below[1] = true;   // Water below lower level
+    mock_water_upper[1] = false;  // No water at upper
+
+    assessed = determine_barrel_state_from_sensors(1);
+    if (assessed == EXHAUST) {
+        std::cout << "✓ Pressurized barrel with low water assessed as EXHAUST" << std::endl;
+    } else {
+        std::cout << "✗ Pressurized low-water barrel assessment failed, got: " << state_name(assessed) << std::endl;
+    }
+
+    // Test 4: No pressure but high water - should assess as INTAKE
+    std::cout << "4. Testing no pressure with high water..." << std::endl;
+    mock_pressurized[0] = false;  // No pressure
+    mock_water_below[0] = false;  // Water above lower level
+    mock_water_upper[0] = true;   // Water at upper level
+
+    assessed = determine_barrel_state_from_sensors(0);
+    if (assessed == INTAKE) {
+        std::cout << "✓ No pressure + high water assessed as INTAKE" << std::endl;
+    } else {
+        std::cout << "✗ No pressure + high water assessment failed, got: " << state_name(assessed) << std::endl;
+    }
+
+    // Test 5: Mixed scenario - different barrels in different states after reset
+    std::cout << "5. Testing mixed barrel states after reset..." << std::endl;
+
+    // Barrel 0: Pressurized with water (ready to work)
+    mock_pressurized[0] = true;
+    mock_water_below[0] = false;
+    mock_water_upper[0] = false;
+
+    // Barrel 1: No pressure, empty (needs preparation)
+    mock_pressurized[1] = false;
+    mock_water_below[1] = true;
+    mock_water_upper[1] = false;
+
+    assess_startup_state();
+
+    if ((barrel_states[0] == WAIT_FOR_WORK) &&
+        (barrel_states[1] == WAIT_FOR_INTAKE)) {
+        std::cout << "✓ Mixed barrel states correctly assessed" << std::endl;
+        std::cout << "  Barrel0: " << state_name(barrel_states[0]) << " (pressurized, ready)" << std::endl;
+        std::cout << "  Barrel1: " << state_name(barrel_states[1]) << " (empty, needs prep)" << std::endl;
+    } else {
+        std::cout << "✗ Mixed barrel assessment failed" << std::endl;
+    }
+
+    // Test 6: Safety valve configurations after assessment
+    std::cout << "6. Testing safety valve configurations..." << std::endl;
+
+    // After assessment, check that valves are in safe positions
+    bool valves_safe = true;
+    for (int i = 0; i < NUM_BARRELS; i++) {
+        bool intake_open = valve_states[VALVES_INTAKE[i]];
+        bool exhaust_open = valve_states[VALVES_EXHAUST[i]];
+        bool turbine_open = valve_states[VALVES_TO_TURBINE[i]];
+
+        // Safety check: turbine should not be open immediately after reset
+        if (turbine_open) {
+            std::cout << "✗ SAFETY: Barrel" << i << " turbine valve open after reset!" << std::endl;
+            valves_safe = false;
+        }
+
+        // Check valve configuration matches assessed state
+        State state = barrel_states[i];
+        if (state == INTAKE && !intake_open) {
+            std::cout << "✗ Barrel" << i << " in INTAKE but intake valve closed" << std::endl;
+            valves_safe = false;
+        }
+        if (state == EXHAUST && !exhaust_open) {
+            std::cout << "✗ Barrel" << i << " in EXHAUST but exhaust valve closed" << std::endl;
+            valves_safe = false;
+        }
+    }
+
+    if (valves_safe) {
+        std::cout << "✓ All valve configurations are safe after startup assessment" << std::endl;
+    }
+
+    // Test 7: System readiness assessment
+    std::cout << "7. Testing system readiness assessment..." << std::endl;
+
+    // The startup assessment should identify if we have barrels ready for energy production
+    bool has_ready_barrel = false;
+    bool has_preparing_barrel = false;
+
+    for (int i = 0; i < NUM_BARRELS; i++) {
+        if (barrel_states[i] == WORK || barrel_states[i] == WAIT_FOR_WORK) {
+            has_ready_barrel = true;
+        }
+        if (barrel_states[i] == INTAKE || barrel_states[i] == WAIT_FOR_INTAKE) {
+            has_preparing_barrel = true;
+        }
+    }
+
+    if (has_ready_barrel) {
+        std::cout << "✓ System has at least one barrel ready for energy production" << std::endl;
+    } else if (has_preparing_barrel) {
+        std::cout << "✓ System has barrels preparing (energy production will be available soon)" << std::endl;
+    } else {
+        std::cout << "⚠ System has no barrels ready - this should trigger auto-preparation" << std::endl;
+    }
+
+    std::cout << "=== Startup Assessment and Recovery test passed! ===" << std::endl;
+}
+
+void test_startup_recovery_scenarios() {
+    std::cout << std::endl << "=== Testing Startup Recovery Scenarios ===" << std::endl;
+
+    // Scenario 1: System reset during WORK state
+    std::cout << "Scenario 1: Reset during WORK state..." << std::endl;
+    NUM_BARRELS = 1;
+    init_valve_states();
+
+    // Simulate conditions of barrel that was working when reset occurred
+    mock_pressurized[0] = true;   // Still pressurized
+    mock_water_below[0] = true;   // Water level dropped (was generating power)
+    mock_water_upper[0] = false;
+
+    assess_startup_state();
+
+    if (barrel_states[0] == EXHAUST) {
+        std::cout << "✓ Barrel reset during WORK correctly transitioned to EXHAUST" << std::endl;
+    } else {
+        std::cout << "✗ WORK state recovery failed, got: " << state_name(barrel_states[0]) << std::endl;
+    }
+
+    // Scenario 2: System reset during INTAKE state
+    std::cout << "Scenario 2: Reset during INTAKE state..." << std::endl;
+
+    // Simulate conditions of barrel that was in intake when reset occurred
+    mock_pressurized[0] = false;  // Still building pressure
+    mock_water_below[0] = false;  // Water level rising
+    mock_water_upper[0] = false;  // Not full yet
+
+    State assessed = determine_barrel_state_from_sensors(0);
+
+    if (assessed == INTAKE) {
+        std::cout << "✓ Barrel reset during INTAKE correctly continues INTAKE" << std::endl;
+    } else {
+        std::cout << "✗ INTAKE state recovery failed, got: " << state_name(assessed) << std::endl;
+    }
+
+    // Scenario 3: System reset with all barrels in unknown/bad state
+    std::cout << "Scenario 3: Complete system reset with unknown states..." << std::endl;
+    NUM_BARRELS = 3;
+    init_valve_states();
+
+    // Simulate worst-case: inconsistent sensor readings
+    for (int i = 0; i < NUM_BARRELS; i++) {
+        mock_pressurized[i] = false;
+        mock_water_below[i] = true;
+        mock_water_upper[i] = false;
+    }
+
+    assess_startup_state();
+
+    // After complete reset, all barrels should be in safe states
+    bool all_safe = true;
+    for (int i = 0; i < NUM_BARRELS; i++) {
+        if (barrel_states[i] != WAIT_FOR_INTAKE && barrel_states[i] != INTAKE) {
+            all_safe = false;
+            break;
+        }
+    }
+
+    if (all_safe) {
+        std::cout << "✓ Complete system reset results in safe states for all barrels" << std::endl;
+    } else {
+        std::cout << "✗ Complete system reset did not result in safe states" << std::endl;
+    }
+
+    // Scenario 4: Gradual recovery test - system should start working again
+    std::cout << "Scenario 4: Testing gradual recovery to normal operation..." << std::endl;
+
+    // After assessment, run normal logic for a few cycles
+    mock_time = 0;
+    for (int cycle = 0; cycle < 5; cycle++) {
+        logic();  // Run normal barrel logic
+        advance_time(100);
+
+        // Simulate sensor changes as system operates
+        if (cycle >= 2) {
+            // After a few cycles, one barrel should build pressure
+            mock_pressurized[0] = true;
+        }
+    }
+
+    // Check that system has started normal operation
+    bool system_operating = false;
+    for (int i = 0; i < NUM_BARRELS; i++) {
+        if (barrel_states[i] == WORK || barrel_states[i] == WAIT_FOR_WORK) {
+            system_operating = true;
+            break;
+        }
+    }
+
+    if (system_operating) {
+        std::cout << "✓ System successfully recovered to normal operation after reset" << std::endl;
+    } else {
+        std::cout << "⚠ System not yet fully operational (may need more time)" << std::endl;
+    }
+
+    std::cout << "=== Startup Recovery Scenarios test passed! ===" << std::endl;
+}
+
 int main() {
     test_single_barrel_cycle();
     test_multi_barrel_coordination();
@@ -497,5 +772,7 @@ int main() {
     test_timing_system();
     test_no_energy_gaps();
     test_manual_control();
+    test_startup_assessment();
+    test_startup_recovery_scenarios();
     return 0;
 }

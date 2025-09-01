@@ -58,6 +58,9 @@ void setup() {
 
   init_timing_system(); // Initialize timing measurement system
 
+  // Perform startup assessment to recover from potential reset
+  assess_startup_state();
+
   log("Compressed Air Energy System Started");
 }
 

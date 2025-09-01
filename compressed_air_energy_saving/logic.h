@@ -39,3 +39,9 @@ void init_timing_system();
 void record_state_duration(int barrel_index, State from_state, unsigned long duration);
 unsigned long get_average_duration(int barrel_index, State state);
 void print_timing_stats();
+
+// Startup assessment and recovery functions
+void assess_startup_state();
+State determine_barrel_state_from_sensors(int barrel_index);
+void safe_barrel_recovery(int barrel_index, State assessed_state);
+void log_startup_assessment();

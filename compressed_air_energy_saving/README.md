@@ -10,6 +10,7 @@ This system is based on [Czech Patent CZ 310138](https://isdv.upv.gov.cz/doc/Ful
 - **Efficiency Optimization**: Minimize energy waste during barrel transitions
 - **Performance Monitoring**: Real-time timing analysis and predictive optimization
 - **Scalable Architecture**: Support for 1-4 barrels with configurable coordination logic
+- **System Robustness**: Automatic startup assessment and recovery from unexpected resets
 
 ## 🏗️ System Architecture
 
@@ -38,6 +39,7 @@ The system ensures continuous energy production by:
 3. **Smart Scheduling**: Prevents resource conflicts during preparation phases
 4. **Adaptive Timing**: Uses historical data to optimize preparation timing
 5. **2-Barrel Optimization**: Direct EXHAUST→INTAKE transitions eliminate energy gaps
+6. **Robust Startup**: Automatic assessment and recovery from unexpected system resets
 
 #### Optimized 2-Barrel Operation
 For systems with exactly 2 barrels, the coordination logic has been optimized to eliminate unnecessary WAIT_FOR_INTAKE states:
@@ -48,6 +50,70 @@ For systems with exactly 2 barrels, the coordination logic has been optimized to
 - **Energy Gap Elimination**: Zero downtime between barrel handoffs
 
 This optimization ensures that 2-barrel systems achieve perfect continuous energy production without the coordination overhead needed for 3+ barrel systems.
+
+## 🛡️ System Robustness & Recovery
+
+### Startup Assessment System
+
+The system includes comprehensive startup assessment capabilities to handle unexpected Arduino resets or power interruptions gracefully. When the system starts, it automatically:
+
+1. **Sensor-Based State Assessment**: Analyzes pressure and water level sensors to determine the actual physical state of each barrel
+2. **Safe State Recovery**: Transitions barrels to appropriate operational states based on sensor readings
+3. **Conservative Safety**: Prioritizes safety over efficiency during recovery (e.g., WORK → WAIT_FOR_WORK transitions)
+4. **Valve Safety Protocol**: Ensures all valves are closed initially before making any state transitions
+
+### Recovery Decision Matrix
+
+The startup assessment uses sensor readings to intelligently determine barrel states:
+
+| Pressure | Water Level | Assessed State | Recovery Action |
+|----------|-------------|----------------|-----------------|
+| High | Above Lower | WAIT_FOR_WORK | All valves closed, ready for coordination |
+| High | Below Lower | EXHAUST | Open exhaust valve, complete pressure release |
+| Low | At Upper | INTAKE | Continue intake process |
+| Low | Below Lower | WAIT_FOR_INTAKE | All valves closed, ready for next cycle |
+| Low | Mid-Level | INTAKE | Continue intake process |
+
+### Safety Features
+
+#### Startup Protocol
+```cpp
+assess_startup_state();  // Called automatically in setup()
+```
+
+- **Valve Reset**: All valves closed initially for safety
+- **Sensor Stabilization**: Brief delays allow sensors to provide accurate readings
+- **Conservative Assessment**: When in doubt, chooses safer operational states
+- **Detailed Logging**: Complete assessment results logged for debugging
+
+#### Recovery Scenarios
+The system handles various reset scenarios:
+
+- **Reset During INTAKE**: Continues intake process based on current pressure/water levels
+- **Reset During WORK**: Transitions to WAIT_FOR_WORK for safe turbine coordination
+- **Reset During EXHAUST**: Continues exhaust process to complete pressure release
+- **Reset Between States**: Places barrels in appropriate waiting states for coordination
+
+#### Platform Compatibility
+The startup assessment system is designed to work across different Arduino platforms:
+
+- **Arduino Uno R3**: Memory-optimized with reduced timing history (3 entries)
+- **Arduino Uno R4 WiFi**: Full feature set with extended timing history (10 entries)
+- **Conditional Compilation**: Automatically adapts to available memory constraints
+
+### Example Startup Assessment Log
+```
+=== STARTUP ASSESSMENT ===
+System reset detected - assessing barrel states from sensors...
+Barrel0 sensors: P=385 (HIGH) U=NO_WATER L=WATER
+Barrel0 assessed as: WAIT_FOR_WORK
+Barrel0 recovery: All valves closed, waiting
+Barrel1 sensors: P=145 (LOW) U=WATER L=WATER  
+Barrel1 assessed as: INTAKE
+Barrel1 recovery: Intake valve opened
+Startup assessment complete: Barrel0:WAIT_FOR_WORK | Barrel1:INTAKE
+=== STARTUP ASSESSMENT COMPLETE ===
+```
 
 ## 🔧 Hardware Components
 
@@ -277,13 +343,16 @@ make test
 - Continuous energy production verification
 - **2-barrel optimization validation**: Zero energy gaps testing
 - **WAIT_FOR_INTAKE efficiency**: Minimization of unnecessary wait states
+- **Startup assessment testing**: Sensor-based state recovery validation
+- **Recovery scenario testing**: Various reset conditions and appropriate responses
 - Timing system validation
 - State transition correctness
 
 ### CI/CD
 Automated testing via GitHub Actions:
 - Validates logic correctness
-- Confirms Arduino compilation compatibility
+- Confirms Arduino compilation compatibility (both Uno R3 and R4 WiFi)
+- Memory optimization validation for different Arduino platforms
 - Ensures code quality and reliability
 
 ## 🤖 Development Methodology
@@ -318,6 +387,7 @@ compressed_air_energy_saving/
 - **Resource Management**: Prevents simultaneous access to shared resources
 - **Performance Optimization**: Continuous improvement through timing analysis
 - **2-Barrel Coordination**: Specialized logic for optimal 2-barrel continuous operation
+- **Startup Assessment**: Sensor-based state recovery for robust system restarts
 
 ## 🎛️ Configuration Options
 

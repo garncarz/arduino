@@ -4,6 +4,13 @@
 #include "constants.h"
 #include "logic.h"
 
+// External declarations for test environment
+#ifndef ARDUINO
+extern bool mock_pressurized[];
+extern bool mock_water_below[];
+extern bool mock_water_upper[];
+#endif
+
 // Define the number of barrels (can be changed dynamically)
 int NUM_BARRELS = 1;
 
@@ -356,4 +363,187 @@ void logic() {
       handle_barrel_logic(i);
     }
   }
+}
+
+// === STARTUP ASSESSMENT AND RECOVERY SYSTEM ===
+
+/**
+ * Assess the physical state of all barrels after a reset/startup
+ * Determines what state each barrel should be in based on sensor readings
+ */
+void assess_startup_state() {
+#ifdef ARDUINO
+  log("=== STARTUP ASSESSMENT ===");
+  log("System reset detected - assessing barrel states from sensors...");
+
+  // First, ensure all valves are closed for safety
+  for (int i = 0; i < NUM_BARRELS; i++) {
+    close_valve(VALVES_INTAKE[i]);
+    close_valve(VALVES_EXHAUST[i]);
+    close_valve(VALVES_TO_TURBINE[i]);
+  }
+
+  delay(100); // Allow valve states to stabilize
+
+  // Assess each barrel and determine its state
+  for (int i = 0; i < NUM_BARRELS; i++) {
+    State assessed_state = determine_barrel_state_from_sensors(i);
+    safe_barrel_recovery(i, assessed_state);
+  }
+
+  log_startup_assessment();
+  log("=== STARTUP ASSESSMENT COMPLETE ===");
+#else
+  // Test environment version
+  for (int i = 0; i < NUM_BARRELS; i++) {
+    State assessed_state = determine_barrel_state_from_sensors(i);
+    safe_barrel_recovery(i, assessed_state);
+  }
+#endif
+}
+
+/**
+ * Determine what state a barrel should be in based on sensor readings
+ */
+
+/**
+ * Determine what state a barrel should be in based on sensor readings
+ */
+State determine_barrel_state_from_sensors(int barrel_index) {
+#ifdef ARDUINO
+  bool has_pressure = pressurized_enough(barrel_index);
+  bool water_at_upper = water_reached_upper_level(barrel_index);
+  bool water_below_lower = water_below_lower_level(barrel_index);
+
+  // Log sensor readings for debugging
+  int pressure_raw = analogRead(SENSORS_PRESSURE[barrel_index]);
+  log("Barrel" + String(barrel_index) + " sensors: P=" + String(pressure_raw) +
+      " (" + (has_pressure ? "HIGH" : "LOW") +
+      ") U=" + (water_at_upper ? "WATER" : "NO_WATER") +
+      " L=" + (water_below_lower ? "NO_WATER" : "WATER"));
+
+  // Decision matrix based on physical state
+  if (has_pressure && !water_below_lower) {
+    // Pressurized with water -> either WORK or WAIT_FOR_WORK
+    // Conservative choice: WAIT_FOR_WORK (safer, won't start turbine immediately)
+    return WAIT_FOR_WORK;
+  }
+  else if (has_pressure && water_below_lower) {
+    // Pressurized but low water -> probably in WORK state that completed
+    // Need to exhaust remaining pressure
+    return EXHAUST;
+  }
+  else if (!has_pressure && water_at_upper) {
+    // No pressure but high water -> probably just finished EXHAUST
+    // Need to complete the cycle by starting INTAKE
+    return INTAKE;
+  }
+  else if (!has_pressure && water_below_lower) {
+    // No pressure, low water -> empty barrel
+    // Safe to start INTAKE or wait
+    return WAIT_FOR_INTAKE;
+  }
+  else if (!has_pressure && !water_below_lower && !water_at_upper) {
+    // No pressure, medium water level -> probably mid-INTAKE
+    return INTAKE;
+  }
+
+  // Default safe state
+  return WAIT_FOR_INTAKE;
+#else
+  // Test environment version - use the mock sensor states
+  bool has_pressure = mock_pressurized[barrel_index];
+  bool water_at_upper = mock_water_upper[barrel_index];
+  bool water_below_lower = mock_water_below[barrel_index];
+
+  // Same decision matrix as Arduino version
+  if (has_pressure && !water_below_lower) {
+    return WAIT_FOR_WORK;
+  }
+  else if (has_pressure && water_below_lower) {
+    return EXHAUST;
+  }
+  else if (!has_pressure && water_at_upper) {
+    return INTAKE;
+  }
+  else if (!has_pressure && water_below_lower) {
+    return WAIT_FOR_INTAKE;
+  }
+  else if (!has_pressure && !water_below_lower && !water_at_upper) {
+    return INTAKE;
+  }
+
+  return WAIT_FOR_INTAKE;
+#endif
+}
+
+/**
+ * Safely transition a barrel to its assessed state
+ */
+void safe_barrel_recovery(int barrel_index, State assessed_state) {
+  barrel_states[barrel_index] = assessed_state;
+
+#ifdef ARDUINO
+  log("Barrel" + String(barrel_index) + " assessed as: " + String(state_name(assessed_state)));
+
+  // Set appropriate valve configuration for the assessed state
+  switch (assessed_state) {
+    case INTAKE:
+      // Safe to start intake immediately
+      open_valve(VALVES_INTAKE[barrel_index]);
+      close_valve(VALVES_EXHAUST[barrel_index]);
+      close_valve(VALVES_TO_TURBINE[barrel_index]);
+      log("Barrel" + String(barrel_index) + " recovery: Intake valve opened");
+      break;
+
+    case WORK:
+      // Don't start turbine immediately - transition to WAIT_FOR_WORK for safety
+      barrel_states[barrel_index] = WAIT_FOR_WORK;
+      close_valve(VALVES_INTAKE[barrel_index]);
+      close_valve(VALVES_EXHAUST[barrel_index]);
+      close_valve(VALVES_TO_TURBINE[barrel_index]);
+      log("Barrel" + String(barrel_index) + " recovery: WORK->WAIT_FOR_WORK for safety");
+      break;
+
+    case EXHAUST:
+      // Safe to continue exhausting
+      close_valve(VALVES_INTAKE[barrel_index]);
+      open_valve(VALVES_EXHAUST[barrel_index]);
+      close_valve(VALVES_TO_TURBINE[barrel_index]);
+      log("Barrel" + String(barrel_index) + " recovery: Exhaust valve opened");
+      break;
+
+    case WAIT_FOR_INTAKE:
+    case WAIT_FOR_WORK:
+      // Keep all valves closed - system will handle transitions
+      close_valve(VALVES_INTAKE[barrel_index]);
+      close_valve(VALVES_EXHAUST[barrel_index]);
+      close_valve(VALVES_TO_TURBINE[barrel_index]);
+      log("Barrel" + String(barrel_index) + " recovery: All valves closed, waiting");
+      break;
+  }
+#else
+  // Test environment version - just set the state, don't call valve functions
+  // (valve functions may not be available or relevant in tests)
+  switch (assessed_state) {
+    case WORK:
+      // Transition WORK to WAIT_FOR_WORK for safety (same as Arduino version)
+      barrel_states[barrel_index] = WAIT_FOR_WORK;
+  }
+#endif
+}
+
+/**
+ * Log the final startup assessment results
+ */
+void log_startup_assessment() {
+#ifdef ARDUINO
+  String assessment = "Startup assessment complete: ";
+  for (int i = 0; i < NUM_BARRELS; i++) {
+    if (i > 0) assessment += " | ";
+    assessment += "Barrel" + String(i) + ":" + String(state_name(barrel_states[i]));
+  }
+  log(assessment.c_str());
+  print_valve_states();
+#endif
 }
