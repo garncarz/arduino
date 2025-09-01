@@ -2,6 +2,8 @@
 
 An Arduino-based control system for a multi-barrel compressed air energy storage and recovery system. This project implements intelligent coordination between multiple air compression barrels to achieve continuous energy production while maximizing efficiency.
 
+🤖 **Development Notice**: This project is being developed rapidly using GitHub Copilot AI assistance. The code and comprehensive test suite are primarily written by GitHub Copilot (Claude Sonnet 4) through iterative prompting. While extensively tested and validated through both rigorous software testing and real Arduino hardware verification, information in this README might not always be fully accurate or up-to-date.
+
 ## 🎯 Overview
 
 This system is based on [Czech Patent CZ 310138](https://isdv.upv.gov.cz/doc/FullFiles/Patents/FullDocuments/310/310138.pdf) and implements a sophisticated state machine for coordinating multiple compressed air barrels to:
@@ -118,6 +120,14 @@ Startup assessment complete: Barrel0:WAIT_FOR_WORK | Barrel1:INTAKE
 ## 🔧 Hardware Components
 
 ![Circuit Diagram](schema.jpg)
+
+### Platform Support
+
+- **Arduino R4 WiFi**: Full feature set with WiFi connectivity and Android app integration (32KB RAM)
+- **Arduino Uno R3**: Core functionality with memory optimizations (2KB RAM)
+- **Arduino Mega 2560**: Enhanced capacity for larger installations (8KB RAM)
+
+*Memory optimizations and verbose logging automatically applied based on target platform.*
 
 ### Per Barrel (up to 4 barrels supported):
 - **3 Solenoid Valves** (controlled via Songle SRD-5VDC-SL-C relay module):
@@ -332,7 +342,8 @@ const int PRESSURE_TARGET = 700;  // Analog reading threshold
 
 ## 🧪 Testing
 
-### Run Unit Tests
+### Automated Testing
+Run the comprehensive test suite:
 ```bash
 make test
 ```
@@ -360,17 +371,15 @@ make setup               # Install Arduino CLI and setup environment
 - **Recovery scenario testing**: Various reset conditions and appropriate responses
 - Timing system validation
 - State transition correctness
+- Memory optimization for constrained platforms
+- Arduino R3/R4 WiFi compatibility
 
-### CI/CD
+### CI/CD Integration
 Automated testing via GitHub Actions:
 - Validates logic correctness
 - Confirms Arduino compilation compatibility (both Uno R3 and R4 WiFi)
 - Memory optimization validation for different Arduino platforms
 - Ensures code quality and reliability
-
-## 🤖 Development Methodology
-
-This project's code and comprehensive test suite were primarily written by GitHub Copilot (Claude Sonnet 4) through iterative prompting. The logic is validated both through rigorous software testing and real Arduino hardware verification.
 
 ## 📁 Project Structure
 
@@ -380,6 +389,10 @@ compressed_air_energy_saving/
 ├── logic.cpp                         # Core state machine logic
 ├── logic.h                           # Logic interface and definitions
 ├── constants.h                       # Hardware pin mappings and constants
+├── commands.cpp                      # Command processing (Serial/WiFi)
+├── commands.h                        # Command interface
+├── wifi.cpp                          # WiFi connectivity (R4 WiFi only)
+├── wifi.h                            # WiFi interface
 ├── test_logic.cc                     # Comprehensive test suite
 ├── Makefile                          # Build and test automation
 ├── schema.fzz/.jpg                   # Fritzing circuit diagrams
@@ -435,12 +448,30 @@ The system provides real-time insights for optimization:
 - **Patent Basis**: [CZ 310138 - Compressed Air Energy Storage System](https://isdv.upv.gov.cz/doc/FullFiles/Patents/FullDocuments/310/310138.pdf)
 - **Circuit Diagrams**: `schema.fzz` (Fritzing format)
 
+## 💻 Development Setup
+
+### Quick Start
+```bash
+git clone [repository]
+cd arduino/compressed_air_energy_saving
+make setup    # Install Arduino CLI and dependencies
+make test     # Verify everything works
+```
+
+### Available Commands
+- `make test` - Run all tests (logic + Arduino compatibility)
+- `make test-logic` - Run only C++ unit tests
+- `make test-arduino` - Test Arduino compilation
+- `make clean` - Clean build artifacts
+- `make setup` - Install Arduino CLI
+- `make help` - Show available targets
+
 ## 🤝 Contributing
 
 1. Fork the repository
 2. Create a feature branch
 3. Run tests: `make test`
-4. Ensure Arduino compatibility
+4. Ensure Arduino compatibility for both R3 and R4 platforms
 5. Submit a pull request
 
 ## 📄 License
