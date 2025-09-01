@@ -108,7 +108,7 @@ System reset detected - assessing barrel states from sensors...
 Barrel0 sensors: P=385 (HIGH) U=NO_WATER L=WATER
 Barrel0 assessed as: WAIT_FOR_WORK
 Barrel0 recovery: All valves closed, waiting
-Barrel1 sensors: P=145 (LOW) U=WATER L=WATER  
+Barrel1 sensors: P=145 (LOW) U=WATER L=WATER
 Barrel1 assessed as: INTAKE
 Barrel1 recovery: Intake valve opened
 Startup assessment complete: Barrel0:WAIT_FOR_WORK | Barrel1:INTAKE
@@ -335,6 +335,19 @@ const int PRESSURE_TARGET = 700;  // Analog reading threshold
 ### Run Unit Tests
 ```bash
 make test
+```
+
+This now runs comprehensive testing including:
+- **Logic Tests**: C++ unit tests for barrel coordination and state machine
+- **Arduino R3 Compatibility**: Compilation test for Arduino Uno with reduced features
+- **Arduino R4 WiFi Compatibility**: Full system compilation test for R4 WiFi
+
+Individual test components can be run separately:
+```bash
+make test-logic          # Run only logic/unit tests
+make test-arduino-r3     # Test Arduino R3 compatibility
+make test-arduino-r4     # Test Arduino R4 WiFi compatibility
+make setup               # Install Arduino CLI and setup environment
 ```
 
 ### Test Coverage

@@ -22,102 +22,50 @@ jobs:
         sudo apt-get update
         sudo apt-get install -y build-essential g++ gcc-avr avr-libc
 
-        # Install Arduino CLI for proper Arduino compilation
-        curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | sudo sh
-        sudo mv bin/arduino-cli /usr/local/bin/
-
-        # Initialize Arduino CLI and install Arduino AVR core
-        arduino-cli core update-index
-        arduino-cli core install arduino:avr
+    - name: Setup development environment (Arduino CLI)
+      working-directory: compressed_air_energy_saving
+      run: make setup
 
     - name: Verify project structure
-      run: |
-        echo "=== Project Structure ==="
-        ls -la compressed_air_energy_saving/
-        echo ""
-        echo "=== Source Files ==="
-        find compressed_air_energy_saving/ -name "*.cpp" -o -name "*.h" -o -name "*.cc" -o -name "*.ino" | sort
-
-    - name: Run compressed air energy saving tests
       working-directory: compressed_air_energy_saving
-      run: |
-        echo "=== Building and Testing Compressed Air Energy Saving System ==="
-        make test
+      run: make verify-structure
 
-    - name: Verify Arduino R3 compatibility (with conditional compilation)
+    - name: Run all tests via Makefile
       working-directory: compressed_air_energy_saving
-      run: |
-        echo "=== Arduino R3 Compatibility Check (Logic Only) ==="
-        echo "Compiling for Arduino Uno (ATmega328P) with WiFi features disabled..."
+      run: make test
 
-        # Create temp directory matching Arduino IDE requirements (directory name = .ino name)
-        mkdir -p /tmp/arduino-r3/compressed_air_energy_saving
-        
-        # Copy ALL files (mimic Arduino IDE behavior)
-        cp *.ino *.cpp *.h /tmp/arduino-r3/compressed_air_energy_saving/
+  test-android-app:
+    runs-on: ubuntu-latest
+    name: Test Android App
+    if: contains(github.event.head_commit.modified, 'compressed_air_energy_saving/android/') || contains(github.event.head_commit.added, 'compressed_air_energy_saving/android/') || github.event_name == 'pull_request'
 
-        echo "Files for R3 compilation:"
-        ls -la /tmp/arduino-r3/compressed_air_energy_saving/
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
 
-        cd /tmp/arduino-r3/compressed_air_energy_saving
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
 
-        # Test R3 compatibility with conditional compilation
-        # The code should use #ifdef ARDUINO_UNOR4_WIFI to disable WiFi features on R3
-        if arduino-cli compile --fqbn arduino:avr:uno compressed_air_energy_saving.ino; then
-          echo "✅ Arduino R3 (Uno) compilation successful with conditional compilation!"
-        else
-          echo "❌ Arduino R3 compilation failed!"
-          echo "Memory usage too high for R3. WiFi features need conditional compilation."
-          exit 1
-        fi
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
 
-    - name: Verify Arduino R4 WiFi compatibility (full system)
-      working-directory: compressed_air_energy_saving
-      run: |
-        echo "=== Arduino R4 WiFi Compatibility Check (Full System) ==="
-        echo "Compiling full system for Arduino Uno R4 WiFi..."
+    - name: Cache Gradle packages
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
 
-        # Create temp directory matching Arduino IDE requirements (directory name = .ino name)  
-        mkdir -p /tmp/arduino-r4/compressed_air_energy_saving
-        
-        # Copy all source files
-        cp *.ino *.cpp *.h /tmp/arduino-r4/compressed_air_energy_saving/
+    - name: Grant execute permission for gradlew
+      working-directory: compressed_air_energy_saving/android
+      run: chmod +x gradlew
 
-        echo "Files for R4 WiFi compilation:"
-        ls -la /tmp/arduino-r4/compressed_air_energy_saving/
-
-        cd /tmp/arduino-r4/compressed_air_energy_saving
-
-        # Test R4 WiFi compatibility
-        if arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi compressed_air_energy_saving.ino; then
-          echo "✅ Arduino R4 WiFi full system compilation successful!"
-        else
-          echo "❌ Arduino R4 WiFi compilation failed!"
-          echo "Attempting to install Arduino R4 WiFi board package..."
-          arduino-cli core update-index
-          arduino-cli core install arduino:renesas_uno
-          
-          # Retry after installing R4 support
-          if arduino-cli compile --fqbn arduino:renesas_uno:unor4wifi compressed_air_energy_saving.ino; then
-            echo "✅ Arduino R4 WiFi compilation successful after installing board package!"
-          else
-            echo "❌ Arduino R4 WiFi compilation still failing!"
-            echo "This may indicate memory usage issues or missing dependencies"
-            exit 1
-          fi
-        fi
-
-    - name: Generate test summary
-      working-directory: compressed_air_energy_saving
-      run: |
-        echo "=== Test Results Summary ==="
-        echo "✅ Multi-barrel coordination logic tests passed"
-        echo "✅ Timing measurement system validated"
-        echo "✅ State machine transitions verified"
-        echo "✅ Continuous energy production confirmed"
-        echo "✅ Arduino R3 (Uno) compatibility verified with reduced memory usage"
-        echo "✅ Arduino R4 WiFi full system compatibility verified"
-        echo ""
-        echo "System ready for Arduino deployment! 🚀"
-        echo "- Deploy to Arduino R3 Uno: Core logic + Serial commands (reduced timing history)"
-        echo "- Deploy to Arduino R4 WiFi: Full system with WiFi + Android app (full timing history)"
+    - name: Run Android tests
+      working-directory: compressed_air_energy_saving/android
+      run: ./run_tests.sh
