@@ -5,10 +5,11 @@
 unsigned long millis();
 #endif
 
-enum State { INTAKE, WORK, EXHAUST, WAIT_FOR_INTAKE, WAIT_FOR_WORK };
+enum State { IDLE, INTAKE, WORK, EXHAUST, WAIT_FOR_INTAKE, WAIT_FOR_WORK };
 
 // Array to track the state of each barrel (sized for maximum)
 extern State barrel_states[]; // Will be sized according to MAX_BARRELS
+extern unsigned long barrel_timers[]; // State transition timestamps
 
 // Global manual override system
 extern bool manual_mode;
@@ -17,6 +18,7 @@ extern State manual_states[];
 // Utility function to convert state enum to string
 inline const char* state_name(State state) {
   switch (state) {
+    case IDLE: return "IDLE";
     case INTAKE: return "INTAKE";
     case WORK: return "WORK";
     case EXHAUST: return "EXHAUST";

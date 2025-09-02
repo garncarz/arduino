@@ -23,6 +23,11 @@ void process_command(String command) {
     } else if (mode_str == "AUTO") {
       manual_mode = false;
       logger(F("System set to AUTO mode - automatic logic enabled"));
+
+      // Assess and recover barrel states when switching to AUTO
+      // This handles potentially messy states from manual mode
+      logger(F("Assessing barrel states for safe automatic operation..."));
+      assess_startup_state();
     } else {
       logger(F("ERROR: Invalid mode. Use: MODE AUTO or MODE MANUAL"));
     }

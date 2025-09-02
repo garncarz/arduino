@@ -15,10 +15,14 @@ void logger(const char* msg);
 #endif
 
 // Define the number of barrels (can be changed dynamically)
-int NUM_BARRELS = 1;
+int NUM_BARRELS = 2;
 
-// Initialize barrel states - all start in WAIT_FOR_INTAKE (system will choose ones to start)
+// Initialize barrel states based on AUTO_START setting
+#if AUTO_START
 State barrel_states[MAX_BARRELS] = {WAIT_FOR_INTAKE, WAIT_FOR_INTAKE, WAIT_FOR_INTAKE, WAIT_FOR_INTAKE};
+#else
+State barrel_states[MAX_BARRELS] = {IDLE, IDLE, IDLE, IDLE};
+#endif
 
 // Global manual override system
 bool manual_mode = false;
@@ -35,15 +39,15 @@ unsigned long barrel_timers[MAX_BARRELS] = {0, 0, 0, 0};
 #endif
 
 // Timing data using simple arrays for Arduino compatibility
-// [barrel][state][history_index] - state index: 0=INTAKE, 1=WORK, 2=EXHAUST, 3=WAIT_FOR_INTAKE, 4=WAIT_FOR_WORK
-unsigned long timing_history[MAX_BARRELS][5][TIMING_HISTORY_SIZE];
-unsigned long current_durations[MAX_BARRELS][5]; // Current cycle durations
+// [barrel][state][history_index] - state index: 0=IDLE, 1=INTAKE, 2=WORK, 3=EXHAUST, 4=WAIT_FOR_INTAKE, 5=WAIT_FOR_WORK
+unsigned long timing_history[MAX_BARRELS][NUM_STATES][TIMING_HISTORY_SIZE];
+unsigned long current_durations[MAX_BARRELS][NUM_STATES]; // Current cycle durations
 int history_index[MAX_BARRELS] = {0, 0, 0, 0}; // Current index in circular buffer
 
 // Initialize timing system
 void init_timing_system() {
   for (int i = 0; i < MAX_BARRELS; i++) {
-    for (int state = 0; state < 5; state++) {
+    for (int state = 0; state < NUM_STATES; state++) {
       for (int j = 0; j < TIMING_HISTORY_SIZE; j++) {
         timing_history[i][state][j] = 0;
       }
@@ -127,6 +131,12 @@ int count_barrels_in_work() {
 // Apply valve actions for a given state (used by manual override)
 void apply_valve_actions(int barrel_index, State state) {
   switch (state) {
+    case IDLE:
+      // IDLE: All valves closed, safe state
+      close_valve(VALVES_INTAKE[barrel_index]);
+      close_valve(VALVES_EXHAUST[barrel_index]);
+      close_valve(VALVES_TO_TURBINE[barrel_index]);
+      break;
     case INTAKE:
       open_valve(VALVES_INTAKE[barrel_index]);
       close_valve(VALVES_EXHAUST[barrel_index]);
@@ -199,6 +209,15 @@ void handle_barrel_logic(int barrel_index) {
   unsigned long current_time = millis();
 
   switch (current_state) {
+    case IDLE:
+      // IDLE state: System startup safety mode - no automatic progression
+      // All valves closed, waiting for external control to activate system
+      // Only manual commands or mode changes can exit this state
+      close_valve(VALVES_INTAKE[barrel_index]);
+      close_valve(VALVES_EXHAUST[barrel_index]);
+      close_valve(VALVES_TO_TURBINE[barrel_index]);
+      break;
+
     case INTAKE:
       if (pressurized_enough(barrel_index)) {
         // Record INTAKE duration before transitioning

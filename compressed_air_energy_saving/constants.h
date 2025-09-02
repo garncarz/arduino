@@ -1,5 +1,13 @@
 #pragma once
 
+// AUTO_START safety flag - default 0 for safety
+#ifndef AUTO_START
+#define AUTO_START 0
+#endif
+
+// Number of states in the State enum
+#define NUM_STATES 6
+
 // Maximum number of barrels supported (for array sizing)
 const int MAX_BARRELS = 4;
 

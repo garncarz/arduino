@@ -58,10 +58,19 @@ void setup() {
 
   init_timing_system(); // Initialize timing measurement system
 
+#if AUTO_START
   // Perform startup assessment to recover from potential reset
   assess_startup_state();
+#endif
 
   logger("Compressed Air Energy System Started");
+
+#if AUTO_START
+  logger(F("AUTO_START enabled: System will begin operations automatically"));
+#else
+  logger(F("AUTO_START disabled: Waiting for external control (e.g., Android app)"));
+  logger(F("Barrels in safe IDLE state - no automatic progression"));
+#endif
 }
 
 void print_status() {

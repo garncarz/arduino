@@ -9,6 +9,7 @@ An Arduino-based control system for a multi-barrel compressed air energy storage
 This system is based on [Czech Patent CZ 310138](https://isdv.upv.gov.cz/doc/FullFiles/Patents/FullDocuments/310/310138.pdf) and implements a sophisticated state machine for coordinating multiple compressed air barrels to:
 
 - **Continuous Energy Production**: Ensure uninterrupted power generation through intelligent barrel coordination
+- **Safety-First Design**: Configurable AUTO_START prevents accidental pressurization on startup
 - **Efficiency Optimization**: Minimize energy waste during barrel transitions
 - **Performance Monitoring**: Real-time timing analysis and predictive optimization
 - **Scalable Architecture**: Support for 1-4 barrels with configurable coordination logic
@@ -18,15 +19,18 @@ This system is based on [Czech Patent CZ 310138](https://isdv.upv.gov.cz/doc/Ful
 
 ### Multi-Barrel State Machine
 
-Each barrel operates through a 5-state cycle:
+Each barrel operates through a 6-state cycle:
 
 ```
+      IDLE (startup safety)
+        ↓
 WAIT_FOR_INTAKE → INTAKE → WORK → EXHAUST → WAIT_FOR_INTAKE
                      ↘    ↗
                   WAIT_FOR_WORK
 ```
 
 **State Descriptions:**
+- **IDLE**: Safe startup state - all valves closed, no automatic progression
 - **INTAKE**: Pressurizing the barrel with compressed air
 - **WORK**: Generating energy by releasing air through turbine
 - **EXHAUST**: Releasing remaining pressure and refilling with water
@@ -217,6 +221,27 @@ Barrel1 cycle: 14600ms, start INTAKE 8000ms early
 
 **Key Optimization**: Notice how in the optimized 2-barrel system, Barrel0 goes directly from EXHAUST to INTAKE (line 11) and Barrel1 does the same (line 15), eliminating WAIT_FOR_INTAKE states that could cause energy gaps.
 
+## 🛡️ Safety Features
+
+### AUTO_START Safety Mode
+For enhanced safety, the system includes a configurable auto-start feature:
+
+**Default Safe Mode (AUTO_START=0)**:
+- Barrels start in **IDLE state** - all valves closed, no automatic pressurization
+- System waits for external control (Android app or manual command)
+- Prevents accidental barrel activation on power-up
+- **Startup assessment skipped** for safety - no automatic state detection
+- Serial output: *"AUTO_START disabled: Waiting for external control"*
+
+**Auto-Start Mode (AUTO_START=1)**:
+- **Startup assessment performed** - barrels recover to appropriate operational states
+- Immediate transition from IDLE to normal operation cycle
+- Serial output: *"AUTO_START enabled: System will begin operations automatically"*
+
+**Configuration**: Edit `constants.h` and change `#define AUTO_START 0` to `#define AUTO_START 1` for automatic startup.
+
+**Android App Integration**: When AUTO_START=0, the system requires "MODE AUTO" command from the Android app to activate IDLE barrels and begin operation. **The startup assessment runs when switching to AUTO mode** to handle any messy states from manual control and automatically sets barrels to appropriate operational states.
+
 ## 🎛️ Manual Control Mode
 
 The system supports manual override of automatic barrel coordination for testing, maintenance, and custom operations.
@@ -292,6 +317,7 @@ Mode: MANUAL
 Barrel0: INTAKE  Barrel1: EXHAUST
 
 > MODE AUTO
+Assessing barrel states for safe automatic operation...
 Automatic mode activated
 ```
 
@@ -333,12 +359,19 @@ echo "STATUS" | nc -u -w1 192.168.1.100 1768
 ### Configuration
 Edit `constants.h` to match your hardware setup:
 ```cpp
+// Safety: AUTO_START controls automatic barrel activation on startup
+#ifndef AUTO_START
+#define AUTO_START 0      // 0=IDLE mode (safe), 1=auto start
+#endif
+
 // Number of barrels in your system
-int NUM_BARRELS = 2;  // Change to 1, 2, 3, or 4
+int NUM_BARRELS = 2;      // Change to 1, 2, 3, or 4
 
 // Adjust pressure threshold if needed
 const int PRESSURE_TARGET = 700;  // Analog reading threshold
 ```
+
+**Safety Note**: Keep `AUTO_START 0` for safe startup requiring Android app activation.
 
 ## 🧪 Testing
 
