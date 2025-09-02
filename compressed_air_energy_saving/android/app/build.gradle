@@ -23,18 +23,47 @@ android {
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }
-    
+
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_1_8
         targetCompatibility JavaVersion.VERSION_1_8
     }
-    
+
     kotlinOptions {
         jvmTarget = '1.8'
     }
 
     buildFeatures {
         viewBinding true
+    }
+
+    // Use Gradle Managed Devices so tests can run on an emulator without manual AVD setup
+    testOptions {
+        animationsDisabled = true
+        managedDevices {
+            devices {
+                emuApi30(com.android.build.api.dsl.ManagedVirtualDevice) {
+                    // Popular device profile and API 30 image
+                    device = "Pixel 4"
+                    apiLevel = 30
+                    // Use ATD (Automated Test Device) image for faster provisioning
+                    systemImageSource = "google-atd"
+                }
+            }
+        }
+    }
+
+    testOptions {
+        managedDevices {
+            devices {
+                // Lightweight headless emulator for automated tests
+                emuApi30(com.android.build.api.dsl.ManagedVirtualDevice) {
+                    device = "Pixel 2"
+                    apiLevel = 30
+                    systemImageSource = "aosp-atd"
+                }
+            }
+        }
     }
 }
 
@@ -46,7 +75,8 @@ dependencies {
     implementation 'androidx.lifecycle:lifecycle-viewmodel-ktx:2.7.0'
     implementation 'androidx.lifecycle:lifecycle-livedata-ktx:2.7.0'
     implementation 'androidx.recyclerview:recyclerview:1.3.2'
-    
+    implementation 'androidx.swiperefreshlayout:swiperefreshlayout:1.1.0'
+
     testImplementation 'junit:junit:4.13.2'
     testImplementation 'org.mockito:mockito-core:5.6.0'
     testImplementation 'org.mockito:mockito-inline:5.2.0'
@@ -56,4 +86,6 @@ dependencies {
     testImplementation 'org.robolectric:robolectric:4.10.3'
     androidTestImplementation 'androidx.test.ext:junit:1.1.5'
     androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+    androidTestImplementation 'androidx.test.uiautomator:uiautomator:2.2.0'
+    androidTestImplementation 'androidx.test:rules:1.5.0'
 }

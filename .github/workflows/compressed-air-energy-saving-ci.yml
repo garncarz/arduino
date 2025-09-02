@@ -68,4 +68,13 @@ jobs:
 
     - name: Run Android tests
       working-directory: compressed_air_energy_saving/android
-      run: ./run_tests.sh
+      run: |
+        ./gradlew --version
+        ./gradlew testDebugUnitTest --no-daemon --console=plain
+
+    - name: Run Android instrumented tests on managed emulator (ATD)
+      working-directory: compressed_air_energy_saving/android
+      env:
+        ANDROID_SDK_ROOT: ${{ env.ANDROID_SDK_ROOT }}
+      run: |
+        ./gradlew emuApi30DebugAndroidTest --no-daemon --console=plain -Pandroid.experimental.testOptions.managedDevices.setupTimeoutMinutes=30

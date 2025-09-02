@@ -9,10 +9,11 @@ import androidx.recyclerview.widget.RecyclerView
 import cz.garncarz.compressed_air_controller.R
 import cz.garncarz.compressed_air_controller.model.BarrelData
 import cz.garncarz.compressed_air_controller.model.BarrelState
-import cz.garncarz.compressed_air_controller.model.SystemMode
 import cz.garncarz.compressed_air_controller.util.BarrelStateColors
 
-class BarrelAdapter : RecyclerView.Adapter<BarrelAdapter.BarrelViewHolder>() {
+class BarrelAdapter(
+    private val onStateClicked: ((BarrelData, View) -> Unit)? = null
+) : RecyclerView.Adapter<BarrelAdapter.BarrelViewHolder>() {
     private var barrels: List<BarrelData> = emptyList()
 
     fun updateBarrels(newBarrels: List<BarrelData>) {
@@ -51,6 +52,15 @@ class BarrelAdapter : RecyclerView.Adapter<BarrelAdapter.BarrelViewHolder>() {
             val backgroundColor = BarrelStateColors.getColorForState(context, barrel.state)
             barrelStateText.background?.let { drawable ->
                 drawable.setTint(backgroundColor)
+            }
+
+            // Allow users to tap the state pill to change state (in MANUAL mode)
+            barrelStateText.isClickable = true
+            barrelStateText.isLongClickable = false
+            barrelStateText.isFocusable = false
+            barrelStateText.isPressed = false
+            barrelStateText.setOnClickListener {
+                onStateClicked?.invoke(barrel, barrelStateText)
             }
         }
 

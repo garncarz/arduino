@@ -1,6 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
-<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+<androidx.swiperefreshlayout.widget.SwipeRefreshLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/swipeRefreshLayout"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent">
+
+<ScrollView
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:padding="16dp">
@@ -32,26 +37,7 @@
                     android:textStyle="bold"
                     android:layout_marginBottom="8dp" />
 
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:orientation="horizontal"
-                    android:layout_marginBottom="8dp">
-
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="Current Mode: "
-                        android:textStyle="bold" />
-
-                    <TextView
-                        android:id="@+id/systemModeText"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="AUTO"
-                        android:textColor="@android:color/holo_blue_dark" />
-
-                </LinearLayout>
+                <!-- Removed redundant Current Mode label; button highlight shows active mode -->
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -65,7 +51,7 @@
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
                         android:layout_marginEnd="8dp"
-                        android:text="AUTO Mode"
+                        android:text="AUTO"
                         style="@style/Widget.Material3.Button" />
 
                     <Button
@@ -73,17 +59,10 @@
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:text="MANUAL Mode"
+                        android:text="MANUAL"
                         style="@style/Widget.Material3.Button.OutlinedButton" />
 
                 </LinearLayout>
-
-                <Button
-                    android:id="@+id/statusButton"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:text="Request Status"
-                    style="@style/Widget.Material3.Button.OutlinedButton" />
 
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -102,13 +81,31 @@
                 android:orientation="vertical"
                 android:padding="16dp">
 
-                <TextView
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Barrel Status"
-                    android:textSize="18sp"
-                    android:textStyle="bold"
-                    android:layout_marginBottom="8dp" />
+                    android:orientation="horizontal"
+                    android:layout_marginBottom="8dp"
+                    android:gravity="center_vertical">
+
+                    <TextView
+                        android:id="@+id/barrelStatusTitle"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text="Barrel Status"
+                        android:textSize="18sp"
+                        android:textStyle="bold" />
+
+                    <TextView
+                        android:id="@+id/barrelStatusAgeText"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:text=" (—)"
+                        android:textSize="14sp"
+                        android:textColor="@android:color/darker_gray"
+                        android:layout_marginStart="6dp" />
+
+                </LinearLayout>
 
                 <androidx.recyclerview.widget.RecyclerView
                     android:id="@+id/barrelRecyclerView"
@@ -119,9 +116,11 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Manual Control -->
+    <!-- Manual Control removed; inline control is available by tapping the state pill in Barrel Status items. -->
+
+        <!-- Scenario Sequence -->
         <com.google.android.material.card.MaterialCardView
-            android:id="@+id/manualControlCard"
+            android:id="@+id/scenarioSequenceCard"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginBottom="16dp"
@@ -138,9 +137,16 @@
                 <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Manual Control"
+                    android:text="🎬 Scenario Sequence"
                     android:textSize="18sp"
                     android:textStyle="bold"
+                    android:layout_marginBottom="8dp" />
+
+                <TextView
+                    android:id="@+id/scenarioStatusText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:text="Ready to start 2-barrel coordination sequence"
                     android:layout_marginBottom="8dp" />
 
                 <LinearLayout
@@ -149,27 +155,43 @@
                     android:orientation="horizontal"
                     android:layout_marginBottom="8dp">
 
-                    <Spinner
-                        android:id="@+id/barrelSpinner"
+                    <Button
+                        android:id="@+id/startSequenceButton"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
                         android:layout_weight="1"
-                        android:layout_marginEnd="8dp" />
+                        android:layout_marginEnd="4dp"
+                        android:text="▶️"
+                        style="@style/Widget.Material3.Button" />
 
-                    <Spinner
-                        android:id="@+id/stateSpinner"
+                    <Button
+                        android:id="@+id/nextStepButton"
                         android:layout_width="0dp"
                         android:layout_height="wrap_content"
-                        android:layout_weight="1" />
+                        android:layout_weight="1"
+                        android:layout_marginStart="4dp"
+                        android:layout_marginEnd="4dp"
+                        android:text="⏭️"
+                        android:enabled="false"
+                        style="@style/Widget.Material3.Button.OutlinedButton" />
+
+                    <Button
+                        android:id="@+id/stopSequenceButton"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content"
+                        android:layout_weight="1"
+                        android:layout_marginStart="4dp"
+                        android:text="⏹️"
+                        style="@style/Widget.Material3.Button.OutlinedButton" />
 
                 </LinearLayout>
 
-                <Button
-                    android:id="@+id/sendCommandButton"
+                <TextView
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="Send Barrel Command"
-                    style="@style/Widget.Material3.Button" />
+                    android:text="Simulates optimized 2-barrel coordination cycles. STOP button safely exhausts all barrels."
+                    android:textSize="12sp"
+                    android:textStyle="italic" />
 
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
@@ -205,3 +227,5 @@
 
     </LinearLayout>
 </ScrollView>
+
+</androidx.swiperefreshlayout.widget.SwipeRefreshLayout>

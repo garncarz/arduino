@@ -38,7 +38,8 @@
                 android:background="@drawable/state_background"
                 android:paddingHorizontal="8dp"
                 android:paddingVertical="4dp"
-                android:textColor="@android:color/white" />
+                android:textColor="@android:color/white"
+                android:contentDescription="Barrel state (tap to change in MANUAL)" />
 
         </LinearLayout>
 
