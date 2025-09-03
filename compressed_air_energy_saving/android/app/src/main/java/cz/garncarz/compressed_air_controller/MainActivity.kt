@@ -64,11 +64,19 @@ class MainActivity : AppCompatActivity() {
     private lateinit var nextStepButton: Button
     private lateinit var stopSequenceButton: Button
     private var scenarioSequence: ScenarioSequence? = null
-    private var isPaused: Boolean = false
     private var savedPausedStates: Map<Int, cz.garncarz.compressed_air_controller.model.BarrelState>? = null
-    private val exhaustHandler = Handler(Looper.getMainLooper())
-    private var exhaustSpamRunnable: Runnable? = null
-    private var exhaustSpamEndAt: Long = 0L
+    private var isPaused: Boolean = false
+    // Two-stage emergency shutdown system
+    private val emergencyHandler = Handler(Looper.getMainLooper())
+    private var emergencyRunnable: Runnable? = null
+    private var emergencyEndAt: Long = 0L
+    private var emergencyStage: EmergencyStage = EmergencyStage.IDLE
+
+    enum class EmergencyStage {
+        IDLE,           // No emergency procedure running
+        EXHAUSTING,     // Stage 1: EXHAUST all barrels to depressurize
+        EXITING         // Stage 2: EXIT all barrels to level water
+    }
 
     // Live log
     private lateinit var logRecyclerView: RecyclerView
@@ -109,7 +117,7 @@ class MainActivity : AppCompatActivity() {
 
     override fun onDestroy() {
         super.onDestroy()
-        cancelExhaustSpam()
+        cancelEmergencyShutdown()
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -246,7 +254,7 @@ class MainActivity : AppCompatActivity() {
             startSequenceButton.isEnabled = true
             nextStepButton.isEnabled = false
             scenarioStatusText.text = "Ready to start 2-barrel coordination sequence"
-            cancelExhaustSpam()
+            cancelEmergencyShutdown()
             // Send command if service is available
             if (serviceBound) {
                 sendCommand("MODE AUTO")
@@ -269,7 +277,7 @@ class MainActivity : AppCompatActivity() {
             startSequenceButton.isEnabled = true
             nextStepButton.isEnabled = false
             scenarioStatusText.text = "Ready to start 2-barrel coordination sequence"
-            cancelExhaustSpam()
+            cancelEmergencyShutdown()
             // Send command if service is available
             if (serviceBound) {
                 sendCommand("MODE MANUAL")
@@ -377,7 +385,7 @@ class MainActivity : AppCompatActivity() {
                 startSequenceButton.isEnabled = true
                 nextStepButton.isEnabled = true
                 stopSequenceButton.isEnabled = true
-                cancelExhaustSpam()
+                cancelEmergencyShutdown()
 
                 Log.d("MainActivity", "Button states updated")
             }
@@ -424,8 +432,8 @@ class MainActivity : AppCompatActivity() {
 
         logAdapter.addLog("🔄 Scenario sequence stopped")
 
-        // Begin one-minute EXHAUST spam (once per second)
-        startExhaustSpam()
+        // Begin two-stage emergency shutdown: EXHAUST then EXIT
+        startEmergencyShutdown()
         // Clear pause state
         isPaused = false
         savedPausedStates = null
@@ -485,7 +493,7 @@ class MainActivity : AppCompatActivity() {
         startSequenceButton.text = "⏸️"
         nextStepButton.isEnabled = true
         savedPausedStates = null
-        cancelExhaustSpam()
+        cancelEmergencyShutdown()
     }
 
     private fun getCurrentBarrelStates(): Map<Int, cz.garncarz.compressed_air_controller.model.BarrelState> {
@@ -508,30 +516,61 @@ class MainActivity : AppCompatActivity() {
         return emptyMap()
     }
 
-    private fun startExhaustSpam() {
-        cancelExhaustSpam()
-        exhaustSpamEndAt = System.currentTimeMillis() + 60_000L
-        exhaustSpamRunnable = object : Runnable {
+    private fun startEmergencyShutdown() {
+        cancelEmergencyShutdown()
+        emergencyStage = EmergencyStage.EXHAUSTING
+        emergencyEndAt = System.currentTimeMillis() + 30_000L // 30 seconds EXHAUST phase
+
+        emergencyRunnable = object : Runnable {
             override fun run() {
-                // Send EXHAUST to barrels 0 and 1
-                for (i in 0..1) {
-                    sendCommand("CMD ${cz.garncarz.compressed_air_controller.model.BarrelState.EXHAUST.name} $i")
-                }
-                if (System.currentTimeMillis() < exhaustSpamEndAt) {
-                    exhaustHandler.postDelayed(this, 1_000L)
-                } else {
-                    logAdapter.addLog("✅ Finished EXHAUST spam (1 minute)")
+                when (emergencyStage) {
+                    EmergencyStage.EXHAUSTING -> {
+                        // Stage 1: EXHAUST all barrels to depressurize safely
+                        for (i in 0..1) {
+                            sendCommand("CMD ${cz.garncarz.compressed_air_controller.model.BarrelState.EXHAUST.name} $i")
+                        }
+
+                        if (System.currentTimeMillis() < emergencyEndAt) {
+                            emergencyHandler.postDelayed(this, 2_000L) // Every 2 seconds during EXHAUST
+                        } else {
+                            // Switch to EXIT stage
+                            logAdapter.addLog("✅ EXHAUST phase complete - starting EXIT phase")
+                            emergencyStage = EmergencyStage.EXITING
+                            emergencyEndAt = System.currentTimeMillis() + 15_000L // 15 seconds EXIT phase
+                            emergencyHandler.postDelayed(this, 1_000L)
+                        }
+                    }
+
+                    EmergencyStage.EXITING -> {
+                        // Stage 2: EXIT all barrels for coordinated water leveling (safe after depressurization)
+                        for (i in 0..1) {
+                            sendCommand("CMD ${cz.garncarz.compressed_air_controller.model.BarrelState.EXIT.name} $i")
+                        }
+
+                        if (System.currentTimeMillis() < emergencyEndAt) {
+                            emergencyHandler.postDelayed(this, 3_000L) // Every 3 seconds during EXIT
+                        } else {
+                            logAdapter.addLog("✅ Emergency shutdown complete - all barrels safe")
+                            emergencyStage = EmergencyStage.IDLE
+                        }
+                    }
+
+                    EmergencyStage.IDLE -> {
+                        // Should not reach here, but handle gracefully
+                    }
                 }
             }
         }
-        exhaustHandler.post(exhaustSpamRunnable!!)
-        logAdapter.addLog("⏱️ Spamming EXHAUST every second for 1 minute…")
+
+        emergencyHandler.post(emergencyRunnable!!)
+        logAdapter.addLog("🚨 Starting emergency shutdown: Stage 1 - EXHAUST (30s)")
     }
 
-    private fun cancelExhaustSpam() {
-        exhaustSpamRunnable?.let { exhaustHandler.removeCallbacks(it) }
-        exhaustSpamRunnable = null
-        exhaustSpamEndAt = 0L
+    private fun cancelEmergencyShutdown() {
+        emergencyRunnable?.let { emergencyHandler.removeCallbacks(it) }
+        emergencyRunnable = null
+        emergencyEndAt = 0L
+        emergencyStage = EmergencyStage.IDLE
     }
 
     private fun getAvailableBarrelCount(): Int {

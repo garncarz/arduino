@@ -5,7 +5,7 @@
 unsigned long millis();
 #endif
 
-enum State { IDLE, INTAKE, WORK, EXHAUST, WAIT_FOR_INTAKE, WAIT_FOR_WORK };
+enum State { IDLE, INIT, INTAKE, WORK, EXHAUST, WAIT_FOR_INTAKE, WAIT_FOR_WORK, EXIT };
 
 // Array to track the state of each barrel (sized for maximum)
 extern State barrel_states[]; // Will be sized according to MAX_BARRELS
@@ -19,11 +19,13 @@ extern State manual_states[];
 inline const char* state_name(State state) {
   switch (state) {
     case IDLE: return "IDLE";
+    case INIT: return "INIT";
     case INTAKE: return "INTAKE";
     case WORK: return "WORK";
     case EXHAUST: return "EXHAUST";
     case WAIT_FOR_INTAKE: return "WAIT_FOR_INTAKE";
     case WAIT_FOR_WORK: return "WAIT_FOR_WORK";
+    case EXIT: return "EXIT";
     default: return "UNKNOWN";
   }
 }

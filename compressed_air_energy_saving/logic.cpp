@@ -17,16 +17,19 @@ void logger(const char* msg);
 // Define the number of barrels (can be changed dynamically)
 int NUM_BARRELS = 2;
 
+// Configurable timing parameters
+unsigned long INTAKE_DURATION_MS = 2000; // Default 2 seconds, configurable via commands
+
 // Initialize barrel states based on AUTO_START setting
 #if AUTO_START
-State barrel_states[MAX_BARRELS] = {WAIT_FOR_INTAKE, WAIT_FOR_INTAKE, WAIT_FOR_INTAKE, WAIT_FOR_INTAKE};
+State barrel_states[MAX_BARRELS] = {INIT, INIT, INIT, INIT};
 #else
 State barrel_states[MAX_BARRELS] = {IDLE, IDLE, IDLE, IDLE};
 #endif
 
 // Global manual override system
 bool manual_mode = false;
-State manual_states[MAX_BARRELS] = {WAIT_FOR_INTAKE, WAIT_FOR_INTAKE, WAIT_FOR_INTAKE, WAIT_FOR_INTAKE};
+State manual_states[MAX_BARRELS] = {INIT, INIT, INIT, INIT};
 
 // Initialize barrel timers - track when each barrel entered its current state
 unsigned long barrel_timers[MAX_BARRELS] = {0, 0, 0, 0};
@@ -106,11 +109,21 @@ void print_timing_stats() {
   }
 }
 
-// Count how many barrels are in INTAKE state
+// Check if any barrel is currently in INTAKE state (includes INIT state for coordination purposes)
+bool any_barrel_in_intake() {
+  for (int i = 0; i < NUM_BARRELS; i++) {
+    if (barrel_states[i] == INTAKE || barrel_states[i] == INIT) {
+      return true;
+    }
+  }
+  return false;
+}
+
+// Count how many barrels are in INTAKE state (includes INIT state for coordination purposes)
 int count_barrels_in_intake() {
   int count = 0;
   for (int i = 0; i < NUM_BARRELS; i++) {
-    if (barrel_states[i] == INTAKE) {
+    if (barrel_states[i] == INTAKE || barrel_states[i] == INIT) {
       count++;
     }
   }
@@ -137,6 +150,13 @@ void apply_valve_actions(int barrel_index, State state) {
       close_valve(VALVES_EXHAUST[barrel_index]);
       close_valve(VALVES_TO_TURBINE[barrel_index]);
       break;
+    case INIT:
+      // INIT: Open INTAKE+WORK valves simultaneously to create air space
+      // This drains water while creating pressurization space
+      open_valve(VALVES_INTAKE[barrel_index]);
+      close_valve(VALVES_EXHAUST[barrel_index]);
+      open_valve(VALVES_TO_TURBINE[barrel_index]);
+      break;
     case INTAKE:
       open_valve(VALVES_INTAKE[barrel_index]);
       close_valve(VALVES_EXHAUST[barrel_index]);
@@ -152,6 +172,12 @@ void apply_valve_actions(int barrel_index, State state) {
       open_valve(VALVES_EXHAUST[barrel_index]);
       close_valve(VALVES_TO_TURBINE[barrel_index]);
       break;
+    case EXIT:
+      // EXIT: Open WORK+EXHAUST valves for complete depressurization
+      close_valve(VALVES_INTAKE[barrel_index]);
+      open_valve(VALVES_EXHAUST[barrel_index]);
+      open_valve(VALVES_TO_TURBINE[barrel_index]);
+      break;
     case WAIT_FOR_INTAKE:
     case WAIT_FOR_WORK:
       close_valve(VALVES_INTAKE[barrel_index]);
@@ -159,11 +185,6 @@ void apply_valve_actions(int barrel_index, State state) {
       close_valve(VALVES_TO_TURBINE[barrel_index]);
       break;
   }
-}
-
-// Check if any barrel is currently in INTAKE state
-bool any_barrel_in_intake() {
-  return count_barrels_in_intake() > 0;
 }
 
 // Check if we're in startup phase (no barrel has ever worked yet)
@@ -179,7 +200,7 @@ bool is_startup_phase() {
 // Check if any barrel is currently in WORK or INTAKE state (excluding the given barrel index)
 bool any_other_barrel_active(int current_barrel) {
   for (int i = 0; i < NUM_BARRELS; i++) {
-    if (i != current_barrel && (barrel_states[i] == WORK || barrel_states[i] == INTAKE)) {
+    if (i != current_barrel && (barrel_states[i] == WORK || barrel_states[i] == INTAKE || barrel_states[i] == INIT)) {
       return true;
     }
   }
@@ -218,11 +239,59 @@ void handle_barrel_logic(int barrel_index) {
       close_valve(VALVES_TO_TURBINE[barrel_index]);
       break;
 
-    case INTAKE:
-      if (pressurized_enough(barrel_index)) {
+    case INIT:
+      // INIT state: Create air space by opening INTAKE+WORK valves simultaneously
+      // This allows water to drain out through WORK valve while air enters through INTAKE
+      // Continue until upper water level drops, then proceed to normal pressurization
+      open_valve(VALVES_INTAKE[barrel_index]);
+      close_valve(VALVES_EXHAUST[barrel_index]);
+      open_valve(VALVES_TO_TURBINE[barrel_index]);
+
+      if (!water_reached_upper_level(barrel_index)) {
+        // Upper water level dropped - air space created
+        unsigned long init_duration = current_time - barrel_timers[barrel_index];
+        record_state_duration(barrel_index, INIT, init_duration);
+
+        // Check coordination limits before transitioning to INTAKE
+        bool should_continue_to_intake = false;
+        if (NUM_BARRELS <= 2) {
+          // For 1-2 barrels: all should continue to INTAKE
+          should_continue_to_intake = true;
+        } else {
+          // For 3+ barrels: first 2 barrels by index get priority to continue to INTAKE
+          int barrels_in_intake = 0;
+          for (int i = 0; i < barrel_index; i++) {
+            if (barrel_states[i] == INTAKE) {
+              barrels_in_intake++;
+            }
+          }
+          // Allow this barrel to continue if less than 2 barrels are already in INTAKE
+          should_continue_to_intake = (barrels_in_intake < 2);
+        }
+
+        if (should_continue_to_intake) {
+          barrel_states[barrel_index] = INTAKE;
+          barrel_timers[barrel_index] = current_time;
+          // Close WORK valve, keep INTAKE open for pressurization
+          close_valve(VALVES_TO_TURBINE[barrel_index]);
+        } else {
+          // Too many barrels preparing, wait for turn
+          barrel_states[barrel_index] = WAIT_FOR_INTAKE;
+          barrel_timers[barrel_index] = current_time;
+          // Close all valves while waiting
+          close_valve(VALVES_INTAKE[barrel_index]);
+          close_valve(VALVES_TO_TURBINE[barrel_index]);
+        }
+      }
+      break;
+
+    case INTAKE: {
+      // Time-limited INTAKE with 2-second maximum duration
+      unsigned long intake_elapsed = current_time - barrel_timers[barrel_index];
+
+      if (pressurized_enough(barrel_index) || intake_elapsed >= INTAKE_DURATION_MS) {
         // Record INTAKE duration before transitioning
-        unsigned long intake_duration = current_time - barrel_timers[barrel_index];
-        record_state_duration(barrel_index, INTAKE, intake_duration);
+        record_state_duration(barrel_index, INTAKE, intake_elapsed);
 
         close_valve(VALVES_INTAKE[barrel_index]);
         // Only transition to WORK if no other barrel is working
@@ -244,6 +313,7 @@ void handle_barrel_logic(int barrel_index) {
       }
       close_valve(VALVES_EXHAUST[barrel_index]);
       break;
+    }
 
     case WORK:
       if (water_below_lower_level(barrel_index)) {
@@ -310,6 +380,26 @@ void handle_barrel_logic(int barrel_index) {
         close_valve(VALVES_INTAKE[barrel_index]);
       }
       close_valve(VALVES_TO_TURBINE[barrel_index]);
+      break;
+
+    case EXIT:
+      // EXIT state: Complete system depressurization using WORK+EXHAUST valves
+      // Continue until system is fully depressurized, then transition to IDLE
+      close_valve(VALVES_INTAKE[barrel_index]);
+      open_valve(VALVES_EXHAUST[barrel_index]);
+      open_valve(VALVES_TO_TURBINE[barrel_index]);
+
+      // Exit when pressure is released and water level is stable
+      if (!pressurized_enough(barrel_index) && water_reached_upper_level(barrel_index)) {
+        unsigned long exit_duration = current_time - barrel_timers[barrel_index];
+        record_state_duration(barrel_index, EXIT, exit_duration);
+
+        barrel_states[barrel_index] = IDLE;
+        barrel_timers[barrel_index] = current_time;
+        // Close all valves for safe IDLE state
+        close_valve(VALVES_EXHAUST[barrel_index]);
+        close_valve(VALVES_TO_TURBINE[barrel_index]);
+      }
       break;
 
     case WAIT_FOR_INTAKE: {
@@ -457,21 +547,22 @@ State determine_barrel_state_from_sensors(int barrel_index) {
   }
   else if (!has_pressure && water_at_upper) {
     // No pressure but high water -> probably just finished EXHAUST
-    // Need to complete the cycle by starting INTAKE
-    return INTAKE;
+    // Start with INIT to create proper air space before normal operation
+    return INIT;
   }
   else if (!has_pressure && water_below_lower) {
     // No pressure, low water -> empty barrel
-    // Safe to start INTAKE or wait
-    return WAIT_FOR_INTAKE;
+    // Safe to start INIT for proper initialization
+    return INIT;
   }
   else if (!has_pressure && !water_below_lower && !water_at_upper) {
-    // No pressure, medium water level -> probably mid-INTAKE
-    return INTAKE;
+    // No pressure, medium water level -> probably mid-process
+    // Start with INIT to ensure proper air space
+    return INIT;
   }
 
-  // Default safe state
-  return WAIT_FOR_INTAKE;
+  // Default safe state for hardware-based startup
+  return INIT;
 #else
   // Test environment version - use the mock sensor states
   bool has_pressure = mock_pressurized[barrel_index];
@@ -486,16 +577,16 @@ State determine_barrel_state_from_sensors(int barrel_index) {
     return EXHAUST;
   }
   else if (!has_pressure && water_at_upper) {
-    return INTAKE;
+    return INIT;
   }
   else if (!has_pressure && water_below_lower) {
-    return WAIT_FOR_INTAKE;
+    return INIT;
   }
   else if (!has_pressure && !water_below_lower && !water_at_upper) {
-    return INTAKE;
+    return INIT;
   }
 
-  return WAIT_FOR_INTAKE;
+  return INIT;
 #endif
 }
 
@@ -510,6 +601,14 @@ void safe_barrel_recovery(int barrel_index, State assessed_state) {
 
   // Set appropriate valve configuration for the assessed state
   switch (assessed_state) {
+    case INIT:
+      // Safe to start INIT - opens INTAKE+WORK to create air space
+      open_valve(VALVES_INTAKE[barrel_index]);
+      close_valve(VALVES_EXHAUST[barrel_index]);
+      open_valve(VALVES_TO_TURBINE[barrel_index]);
+      logger("Barrel" + String(barrel_index) + " recovery: INIT - Intake+Work valves opened");
+      break;
+
     case INTAKE:
       // Safe to start intake immediately
       open_valve(VALVES_INTAKE[barrel_index]);
@@ -535,6 +634,14 @@ void safe_barrel_recovery(int barrel_index, State assessed_state) {
       logger("Barrel" + String(barrel_index) + " recovery: Exhaust valve opened");
       break;
 
+    case EXIT:
+      // Safe to start EXIT - opens WORK+EXHAUST for complete depressurization
+      close_valve(VALVES_INTAKE[barrel_index]);
+      open_valve(VALVES_EXHAUST[barrel_index]);
+      open_valve(VALVES_TO_TURBINE[barrel_index]);
+      logger("Barrel" + String(barrel_index) + " recovery: EXIT - Work+Exhaust valves opened");
+      break;
+
     case WAIT_FOR_INTAKE:
     case WAIT_FOR_WORK:
       // Keep all valves closed - system will handle transitions
@@ -551,6 +658,7 @@ void safe_barrel_recovery(int barrel_index, State assessed_state) {
     case WORK:
       // Transition WORK to WAIT_FOR_WORK for safety (same as Arduino version)
       barrel_states[barrel_index] = WAIT_FOR_WORK;
+      break;
   }
 #endif
 }

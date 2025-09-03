@@ -5,8 +5,8 @@
 #define AUTO_START 0
 #endif
 
-// Number of states in the State enum
-#define NUM_STATES 6
+// Number of states in the State enum (IDLE, INIT, INTAKE, WORK, EXHAUST, WAIT_FOR_INTAKE, WAIT_FOR_WORK, EXIT)
+#define NUM_STATES 8
 
 // Maximum number of barrels supported (for array sizing)
 const int MAX_BARRELS = 4;
@@ -29,3 +29,6 @@ extern const int SENSORS_PRESSURE[MAX_BARRELS]; // Defined in .ino file
 
 // Thresholds
 const int PRESSURE_TARGET = 700;
+
+// Timing constraints for hardware-based operations - configurable variables
+extern unsigned long INTAKE_DURATION_MS; // INTAKE state duration limit (default 2 seconds, configurable)

@@ -19,33 +19,33 @@ This system is based on [Czech Patent CZ 310138](https://isdv.upv.gov.cz/doc/Ful
 
 ### Multi-Barrel State Machine
 
-Each barrel operates through a 6-state cycle:
+Each barrel operates through an 8-state system with hardware-accurate valve coordination.
 
-```
-      IDLE (startup safety)
-        ↓
-WAIT_FOR_INTAKE → INTAKE → WORK → EXHAUST → WAIT_FOR_INTAKE
-                     ↘    ↗
-                  WAIT_FOR_WORK
-```
+**Example sequence:** IDLE → INIT → INTAKE → WAIT_FOR_WORK → WORK → EXHAUST → INTAKE → WORK → EXHAUST → (continues cycling...)
+
+**Emergency state:** EXIT (manual shutdown, leads back to IDLE)
 
 **State Descriptions:**
 - **IDLE**: Safe startup state - all valves closed, no automatic progression
-- **INTAKE**: Pressurizing the barrel with compressed air
+- **INIT**: Initial air space preparation - opens INTAKE+WORK valves simultaneously for hardware coordination
+- **WAIT_FOR_INTAKE**: Waiting for opportunity to start preparation
+- **INTAKE**: Pressurizing the barrel with compressed air (time-limited to configurable duration)
+- **WAIT_FOR_WORK**: Ready to work, waiting for current working barrel to finish
 - **WORK**: Generating energy by releasing air through turbine
 - **EXHAUST**: Releasing remaining pressure and refilling with water
-- **WAIT_FOR_INTAKE**: Waiting for opportunity to start preparation
-- **WAIT_FOR_WORK**: Ready to work, waiting for current working barrel to finish
+- **EXIT**: Final coordination - opens WORK+EXHAUST valves simultaneously for complete pressure release (emergency/manual use)
 
 ### Coordination Logic
 
 The system ensures continuous energy production by:
-1. **Overlapping Preparation**: Next barrel starts INTAKE while current barrel is in WORK
-2. **Immediate Handoff**: Zero-gap transitions between working barrels
-3. **Smart Scheduling**: Prevents resource conflicts during preparation phases
-4. **Adaptive Timing**: Uses historical data to optimize preparation timing
-5. **2-Barrel Optimization**: Direct EXHAUST→INTAKE transitions eliminate energy gaps
-6. **Robust Startup**: Automatic assessment and recovery from unexpected system resets
+1. **Hardware-Accurate Valve Coordination**: INIT state coordinates INTAKE+WORK valves, EXIT state coordinates WORK+EXHAUST valves
+2. **Time-Limited INTAKE**: Configurable INTAKE duration prevents excessive pressure buildup (default 2 seconds, configurable 100-10000ms)
+3. **Overlapping Preparation**: Next barrel starts INTAKE while current barrel is in WORK
+4. **Immediate Handoff**: Zero-gap transitions between working barrels
+5. **Smart Scheduling**: Prevents resource conflicts during preparation phases
+6. **Adaptive Timing**: Uses historical data to optimize preparation timing
+7. **2-Barrel Optimization**: Direct EXHAUST→INTAKE transitions eliminate energy gaps
+8. **Robust Startup**: Automatic assessment and recovery from unexpected system resets
 
 #### Optimized 2-Barrel Operation
 For systems with exactly 2 barrels, the coordination logic has been optimized to eliminate unnecessary WAIT_FOR_INTAKE states:
@@ -242,105 +242,145 @@ For enhanced safety, the system includes a configurable auto-start feature:
 
 **Android App Integration**: When AUTO_START=0, the system requires "MODE AUTO" command from the Android app to activate IDLE barrels and begin operation. **The startup assessment runs when switching to AUTO mode** to handle any messy states from manual control and automatically sets barrels to appropriate operational states.
 
-## 🎛️ Manual Control Mode
+## 🎛️ Advanced Command System
 
-The system supports manual override of automatic barrel coordination for testing, maintenance, and custom operations.
+The system supports comprehensive control via Serial (9600 baud) and WiFi UDP (port 1768):
 
-### Command Interface
-Manual commands can be sent via:
-- **Serial connection** (9600 baud)
-- **WiFi UDP** (port 1768, same as logging port)
-
-### Available Commands
-
-#### Mode Control
+### Mode Control
 ```
-MODE AUTO    # Switch to automatic operation
-MODE MANUAL  # Enable manual control mode
+MODE AUTO    # Switch to automatic operation with startup assessment
+MODE MANUAL  # Enable manual control mode (preserves current states)
 ```
 
-#### Direct Barrel Control
+### Direct Barrel Control
 ```
-CMD <STATE> <BARREL>    # Set specific barrel to specific state
+CMD <STATE> <BARREL>    # Set specific barrel to specific state (auto-switches to manual)
 ```
 
 **Examples:**
 ```
-CMD INTAKE 0      # Force Barrel 0 to INTAKE state
-CMD WORK 1        # Force Barrel 1 to WORK state
-CMD EXHAUST 0     # Force Barrel 0 to EXHAUST state
+CMD INIT 0         # Initialize air space in Barrel 0 (INTAKE+WORK coordination)
+CMD INTAKE 0       # Force Barrel 0 to time-limited INTAKE state
+CMD WORK 1         # Force Barrel 1 to WORK state
+CMD EXHAUST 0      # Force Barrel 0 to EXHAUST state
+CMD EXIT 1         # Force coordinated exit in Barrel 1 (WORK+EXHAUST coordination)
 ```
 
 **Supported States:**
-- `INTAKE` - Pressurize barrel with compressed air
+- `IDLE` - Safe state, all valves closed
+- `INIT` - Air space preparation with valve coordination
+- `INTAKE` - Pressurize barrel (time-limited)
 - `WORK` - Generate energy through turbine
 - `EXHAUST` - Release pressure and refill with water
+- `EXIT` - Coordinated pressure release
+- `WAIT_FOR_INTAKE`, `WAIT_FOR_WORK` - Coordination states
 
-#### System Status
+### Individual Valve Control
 ```
-STATUS    # Display current mode and all barrel states
-HELP      # Show available commands
+VALVE <BARREL> <VALVE> <OPEN|CLOSE>    # Control individual valves directly
 ```
 
-### Manual Mode Features
+**Examples:**
+```
+VALVE 0 INTAKE OPEN      # Open Barrel 0 intake valve
+VALVE 1 WORK CLOSE       # Close Barrel 1 work/turbine valve
+VALVE 0 EXHAUST OPEN     # Open Barrel 0 exhaust valve
+```
+
+**Available Valves:**
+- `INTAKE` - Compressed air intake valve
+- `WORK` - Turbine/work valve for energy generation
+- `EXHAUST` - Pressure release and water refill valve
+
+### System Configuration
+```
+SET <PARAMETER> <VALUE>    # Configure system parameters at runtime
+```
+
+**Examples:**
+```
+SET INTAKE_DURATION 3000    # Set INTAKE time limit to 3 seconds (100-10000ms range)
+SET NUM_BARRELS 3           # Configure system for 3 barrels (1-4 range)
+```
+
+**Configurable Parameters:**
+- `INTAKE_DURATION` - Time limit for INTAKE state (100-10000 milliseconds)
+- `NUM_BARRELS` - Number of active barrels in the system (1-4 barrels)
+
+### System Status and Help
+```
+STATUS    # Display current mode, barrel states, and configuration
+HELP      # Show comprehensive command reference
+```
+
+### Command Features
 
 #### Global Control
-- **Single Mode Setting**: One global manual mode affects all barrels
-- **Persistent State**: Manual mode remains active until explicitly disabled
+- **Enhanced Mode Switching**: AUTO mode performs startup assessment, MANUAL mode preserves current states
+- **Auto-Switch to Manual**: Using CMD or VALVE commands automatically switches to manual mode
+- **Persistent Configuration**: SET commands make runtime changes that persist until restart
 - **No Timeouts**: Manual control persists indefinitely (no automatic return to auto mode)
 - **Override Protection**: Manual mode completely overrides automatic state machine
 
 #### Safety & Flexibility
 - **Real-time Switching**: Can switch between manual and automatic at any time
 - **State Preservation**: Manual states persist until explicitly changed
-- **Full Valve Control**: Manual mode directly controls valve positions
-- **Monitoring Continues**: Sensor readings and logging continue in manual mode
+- **Full Valve Control**: VALVE commands provide direct individual valve control
+- **Runtime Configuration**: SET commands allow parameter changes without recompilation
+- **Monitoring Continues**: Sensor readings and logging continue in all modes
 
-### Example Manual Session
+### Example Enhanced Session
 ```bash
 # Connect via serial or UDP
-> MODE MANUAL
-Manual mode activated
+> STATUS
+Number of barrels: 2
+INTAKE duration limit: 2000 ms
+Mode: AUTO
+Barrel0: WORK (auto)  Barrel1: EXHAUST (auto)
+
+> SET INTAKE_DURATION 3000
+INTAKE duration set to 3000 ms
+
+> VALVE 0 WORK CLOSE
+Auto-switching to MANUAL mode for direct barrel control
+Barrel 0 WORK valve closed
+
+> CMD INIT 1
+Manual command: Barrel1 set to INIT
 
 > STATUS
+Number of barrels: 2
+INTAKE duration limit: 3000 ms
 Mode: MANUAL
-Barrel0: EXHAUST  Barrel1: WORK
-
-> CMD INTAKE 0
-Barrel 0 set to INTAKE
-
-> CMD EXHAUST 1
-Barrel 1 set to EXHAUST
-
-> STATUS
-Mode: MANUAL
-Barrel0: INTAKE  Barrel1: EXHAUST
+Barrel0: WORK (manual)  Barrel1: INIT (manual)
 
 > MODE AUTO
+System set to AUTO mode - automatic logic enabled
 Assessing barrel states for safe automatic operation...
-Automatic mode activated
 ```
 
-### WiFi Manual Control
-For remote operation, you can send commands via UDP to the same port used for logging:
+### WiFi Command Interface
+For remote operation, send commands via UDP to port 1768:
 
 **Using netcat (Linux/Mac):**
 ```bash
-echo "MODE MANUAL" | nc -u -w1 192.168.1.100 1768
-echo "CMD WORK 0" | nc -u -w1 192.168.1.100 1768
+echo "SET NUM_BARRELS 3" | nc -u -w1 192.168.1.100 1768
+echo "VALVE 0 INTAKE OPEN" | nc -u -w1 192.168.1.100 1768
+echo "CMD INIT 1" | nc -u -w1 192.168.1.100 1768
 echo "STATUS" | nc -u -w1 192.168.1.100 1768
 ```
 
 **Using UDP Terminal (Android):**
 1. Set target IP to Arduino's WiFi IP
 2. Set port to 1768
-3. Type commands and press send
+3. Type commands (SET, VALVE, CMD, STATUS) and press send
 
 ### Use Cases
-- **System Testing**: Manually cycle through barrel states for validation
-- **Maintenance**: Isolate specific barrels for inspection
-- **Troubleshooting**: Force specific states to diagnose issues
-- **Custom Operations**: Non-standard barrel coordination patterns
+- **System Testing**: Manually cycle through all 8 barrel states for validation
+- **Hardware Testing**: Individual valve control for maintenance and diagnostics
+- **Runtime Configuration**: Adjust INTAKE duration and barrel count without recompilation
+- **Troubleshooting**: Force specific states and valve positions to diagnose issues
+- **Custom Operations**: Non-standard barrel coordination patterns with INIT/EXIT states
 - **Emergency Control**: Override automatic logic in fault conditions
 
 ## 🚀 Getting Started
@@ -361,17 +401,22 @@ Edit `constants.h` to match your hardware setup:
 ```cpp
 // Safety: AUTO_START controls automatic barrel activation on startup
 #ifndef AUTO_START
-#define AUTO_START 0      // 0=IDLE mode (safe), 1=auto start
+#define AUTO_START 0      // 0=IDLE mode (safe), 1=auto start with INIT states
 #endif
 
-// Number of barrels in your system
+// Number of barrels in your system (can also be changed at runtime)
 int NUM_BARRELS = 2;      // Change to 1, 2, 3, or 4
+
+// Timing configuration (can also be changed at runtime)
+unsigned long INTAKE_DURATION_MS = 2000;  // INTAKE time limit in milliseconds
 
 // Adjust pressure threshold if needed
 const int PRESSURE_TARGET = 700;  // Analog reading threshold
 ```
 
-**Safety Note**: Keep `AUTO_START 0` for safe startup requiring Android app activation.
+**Safety Note**: Keep `AUTO_START 0` for safe startup requiring command activation.
+
+**Runtime Configuration**: Use SET commands to change NUM_BARRELS and INTAKE_DURATION_MS without recompilation.
 
 ## 🧪 Testing
 
@@ -395,15 +440,20 @@ make setup               # Install Arduino CLI and setup environment
 ```
 
 ### Test Coverage
-- Single barrel operation cycle
-- Multi-barrel coordination logic
-- Continuous energy production verification
-- **2-barrel optimization validation**: Zero energy gaps testing
+- **8-State Machine Testing**: Complete validation of all states (IDLE, INIT, INTAKE, WORK, EXHAUST, EXIT, WAIT_FOR_INTAKE, WAIT_FOR_WORK)
+- Single barrel operation cycle with time-limited INTAKE
+- Multi-barrel coordination logic with hardware-accurate valve control
+- **Individual Valve Control**: Testing of VALVE commands for direct hardware control
+- **Runtime Configuration**: Validation of SET commands for parameter changes
+- **Enhanced Command System**: Testing of all CMD states including INIT and EXIT
+- Continuous energy production verification with zero energy gaps
+- **2-barrel optimization validation**: Zero energy gaps testing with INIT/EXIT coordination
 - **WAIT_FOR_INTAKE efficiency**: Minimization of unnecessary wait states
 - **Startup assessment testing**: Sensor-based state recovery validation
 - **Recovery scenario testing**: Various reset conditions and appropriate responses
-- Timing system validation
-- State transition correctness
+- **Time-Limited INTAKE**: Configurable duration testing (100-10000ms range)
+- Timing system validation with predictive optimization
+- State transition correctness for all 8 states
 - Memory optimization for constrained platforms
 - Arduino R3/R4 WiFi compatibility
 
@@ -435,46 +485,61 @@ compressed_air_energy_saving/
 ## 🔬 Technical Details
 
 ### State Machine Implementation
+- **8-State Architecture**: Complete implementation with IDLE, INIT, INTAKE, WORK, EXHAUST, EXIT, WAIT_FOR_INTAKE, WAIT_FOR_WORK
+- **Hardware-Accurate Valve Coordination**: INIT and EXIT states provide proper valve sequencing based on real hardware analysis
+- **Time-Limited Operations**: Configurable INTAKE duration prevents hardware damage (100-10000ms range)
 - **Arduino-optimized**: Uses simple arrays instead of complex data structures
-- **Memory efficient**: Suitable for Arduino Uno's 2KB SRAM
+- **Memory efficient**: Suitable for Arduino Uno's 2KB SRAM with conditional compilation
 - **Timing precision**: Millisecond-accurate state duration tracking
 - **Robust coordination**: Prevents conflicts and ensures system stability
 
 ### Key Algorithms
+- **8-State Coordination**: Hardware-accurate state machine with INIT/EXIT valve coordination
+- **Time-Limited INTAKE**: Configurable duration limits prevent excessive pressure (default 2000ms)
 - **Barrel Selection**: Intelligent choosing of next barrel to prepare
 - **Transition Timing**: Optimal handoff timing based on historical data
 - **Resource Management**: Prevents simultaneous access to shared resources
 - **Performance Optimization**: Continuous improvement through timing analysis
 - **2-Barrel Coordination**: Specialized logic for optimal 2-barrel continuous operation
 - **Startup Assessment**: Sensor-based state recovery for robust system restarts
+- **Individual Valve Control**: Direct hardware control for maintenance and testing
+- **Runtime Configuration**: Dynamic parameter adjustment without recompilation
 
 ## 🎛️ Configuration Options
 
 ### Single Barrel Mode (`NUM_BARRELS = 1`)
-- Simple cycle: INTAKE → WORK → EXHAUST → repeat
+- Complete 8-state cycle: IDLE → INIT → INTAKE → WORK → EXHAUST → EXIT → repeat
+- Time-limited INTAKE prevents pressure buildup issues
+- Individual valve control for maintenance and testing
 - Ideal for testing and basic energy storage
 
 ### Two-Barrel Mode (`NUM_BARRELS = 2`) - **Optimized**
-- **Continuous energy production** with zero gaps
-- **Direct transitions**: EXHAUST → INTAKE (bypasses WAIT_FOR_INTAKE)
+- **Continuous energy production** with zero gaps using INIT/EXIT coordination
+- **Hardware-accurate transitions**: INIT creates air space, EXIT provides coordinated release
 - **Perfect coordination**: Always exactly one barrel working
+- **Time-limited INTAKE**: Prevents excessive pressure with configurable duration
 - **Zero overhead**: Eliminates waiting states entirely
 
 ### Multi-Barrel Mode (`NUM_BARRELS = 3-4`)
-- Advanced continuous energy production
-- Overlapping barrel preparation with smart scheduling
+- Advanced continuous energy production with 8-state coordination
+- Overlapping barrel preparation with smart scheduling and INIT state preparation
 - WAIT_FOR_INTAKE coordination prevents resource conflicts
+- Time-limited INTAKE with EXIT state coordination for proper pressure management
 - Zero-gap energy handoffs with predictive timing
 
 ## 📈 Performance Optimization
 
 The system provides real-time insights for optimization:
+- **8-State Cycle Analysis**: Complete timing analysis for all states including INIT and EXIT
+- **Time-Limited INTAKE Monitoring**: Track configurable INTAKE duration effectiveness
 - **Cycle Time Analysis**: Identify bottlenecks in barrel operations
 - **Wait Time Monitoring**: Measure coordination efficiency
 - **Predictive Timing**: Optimize preparation start times
 - **Historical Trends**: Long-term performance analysis
-- **2-Barrel Efficiency**: Specialized optimization eliminating energy gaps
+- **2-Barrel Efficiency**: Specialized optimization eliminating energy gaps with INIT/EXIT coordination
 - **State Minimization**: Reduced WAIT_FOR_INTAKE usage for improved performance
+- **Individual Component Analysis**: Valve-level performance monitoring
+- **Runtime Configuration Impact**: Monitor effects of parameter changes
 
 ## 🔗 References
 
@@ -513,4 +578,4 @@ This project implements concepts from Czech Patent CZ 310138. Please review pate
 
 ---
 
-**🎯 Project Goal**: Achieve continuous, efficient compressed air energy production through intelligent multi-barrel coordination and real-time performance optimization.
+**🎯 Project Goal**: Achieve continuous, efficient compressed air energy production through intelligent multi-barrel coordination, hardware-accurate valve control, runtime configurability, and real-time performance optimization using an advanced 8-state machine with individual component control capabilities.

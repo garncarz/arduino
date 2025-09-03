@@ -1,14 +1,17 @@
 package cz.garncarz.compressed_air_controller.model
 
 /**
- * Arduino System States as defined in README
+ * Arduino System States as defined in README (8-state machine)
  */
 enum class BarrelState {
-    WAIT_FOR_INTAKE,  // Barrel waiting for opportunity to start intake cycle
-    INTAKE,           // Barrel filling with water and building air pressure
-    WAIT_FOR_WORK,    // Barrel pressurized and ready to work, waiting for handoff
-    WORK,             // Barrel actively generating power through turbine
-    EXHAUST;          // Barrel releasing pressure and emptying water
+    IDLE,             // Safe startup state - all valves closed, no automatic progression
+    INIT,             // Initial air space preparation - opens INTAKE+WORK valves simultaneously
+    INTAKE,           // Pressurizing the barrel with compressed air (time-limited)
+    WORK,             // Generating energy by releasing air through turbine
+    EXHAUST,          // Releasing remaining pressure and refilling with water
+    EXIT,             // Final coordination - opens WORK+EXHAUST valves simultaneously
+    WAIT_FOR_INTAKE,  // Waiting for opportunity to start preparation
+    WAIT_FOR_WORK;    // Ready to work, waiting for current working barrel to finish
 
     companion object {
         fun fromString(state: String): BarrelState? {
@@ -63,11 +66,11 @@ data class ArduinoSystemState(
     val lastHeartbeat: Long = 0L
 ) {
     fun getBarrelCount(): Int = barrels.size
-    
-    fun getWorkingBarrel(): BarrelData? = 
+
+    fun getWorkingBarrel(): BarrelData? =
         barrels.values.find { it.state == BarrelState.WORK }
-    
-    fun isConnected(): Boolean = 
+
+    fun isConnected(): Boolean =
         connectionStatus == ConnectionStatus.CONNECTED &&
         (System.currentTimeMillis() - lastHeartbeat) < HEARTBEAT_TIMEOUT_MS
 

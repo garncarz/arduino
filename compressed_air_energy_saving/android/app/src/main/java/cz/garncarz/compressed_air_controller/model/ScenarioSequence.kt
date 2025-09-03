@@ -13,25 +13,25 @@ data class SequenceStep(
 /**
  * ScenarioSequence simulates optimized 2-barrel compressed air coordination
  *
- * 8-Step Optimization Algorithm:
+ * Complete 8-step sequence:
  * Step 1: Both INTAKE (initial pressurization)
- * Step 2: Barrel 0 WORK, Barrel 1 INTAKE (first barrel ready)
- * Step 3: Barrel 0 WORK, Barrel 1 WAIT_FOR_WORK (second barrel ready, waiting)
+ * Step 2: Barrel 0 WORK, Barrel 1 INTAKE
+ * Step 3: Barrel 0 WORK, Barrel 1 WAIT_FOR_WORK
  * Step 4: Barrel 0 EXHAUST, Barrel 1 WORK (zero-gap handoff)
- * Step 5: Barrel 0 INTAKE, Barrel 1 WORK (direct transition optimization)
- * Step 6: Barrel 0 WAIT_FOR_WORK, Barrel 1 WORK (first barrel ready again)
+ * Step 5: Barrel 0 INTAKE, Barrel 1 WORK (direct transition)
+ * Step 6: Barrel 0 WAIT_FOR_WORK, Barrel 1 WORK
  * Step 7: Barrel 0 WORK, Barrel 1 EXHAUST (second handoff)
- * Step 8: Barrel 0 WORK, Barrel 1 INTAKE (cycle continues)
+ * Step 8: Barrel 0 WORK, Barrel 1 INTAKE (cycle continuation)
+ * Then loops back to step 2 for continuous operation
  */
 class ScenarioSequence(private val barrelCount: Int) {
 
     private var currentStepIndex = -1
     private var isSequenceRunning = false
     private val sequenceSteps: List<SequenceStep>
-    private var initialized = false
 
     init {
-        // Initialize the 8-step 2-barrel optimization sequence
+        // Initialize the 8-step continuous 2-barrel sequence
         sequenceSteps = createOptimizedSequence()
     }
 
@@ -48,11 +48,11 @@ class ScenarioSequence(private val barrelCount: Int) {
                     0 to BarrelState.INTAKE,
                     1 to BarrelState.INTAKE
                 ),
-                explanation = "Both barrels begin simultaneous pressurization for system startup"
+                explanation = "Both barrels begin pressurization cycle to reach working pressure"
             ),
             SequenceStep(
                 stepNumber = 2,
-                description = "First Barrel Ready",
+                description = "First Barrel Working",
                 barrelStates = mapOf(
                     0 to BarrelState.WORK,
                     1 to BarrelState.INTAKE
@@ -61,7 +61,7 @@ class ScenarioSequence(private val barrelCount: Int) {
             ),
             SequenceStep(
                 stepNumber = 3,
-                description = "Second Barrel Ready",
+                description = "Preparation Phase",
                 barrelStates = mapOf(
                     0 to BarrelState.WORK,
                     1 to BarrelState.WAIT_FOR_WORK
@@ -75,7 +75,7 @@ class ScenarioSequence(private val barrelCount: Int) {
                     0 to BarrelState.EXHAUST,
                     1 to BarrelState.WORK
                 ),
-                explanation = "Critical transition: Barrel 0 exhausts precisely as Barrel 1 takes over working"
+                explanation = "Critical handoff: Barrel 0 exhausts as Barrel 1 takes over working"
             ),
             SequenceStep(
                 stepNumber = 5,
@@ -84,16 +84,16 @@ class ScenarioSequence(private val barrelCount: Int) {
                     0 to BarrelState.INTAKE,
                     1 to BarrelState.WORK
                 ),
-                explanation = "Optimization: Barrel 0 skips wait state and directly starts intake while Barrel 1 works"
+                explanation = "Barrel 0 directly transitions to intake for next cycle while Barrel 1 continues working"
             ),
             SequenceStep(
                 stepNumber = 6,
-                description = "First Barrel Ready Again",
+                description = "Second Preparation",
                 barrelStates = mapOf(
                     0 to BarrelState.WAIT_FOR_WORK,
                     1 to BarrelState.WORK
                 ),
-                explanation = "Barrel 0 reaches pressure again and waits for next handoff"
+                explanation = "Barrel 0 reaches pressure and waits while Barrel 1 continues working"
             ),
             SequenceStep(
                 stepNumber = 7,
@@ -102,7 +102,7 @@ class ScenarioSequence(private val barrelCount: Int) {
                     0 to BarrelState.WORK,
                     1 to BarrelState.EXHAUST
                 ),
-                explanation = "Roles reverse: Barrel 0 takes over working while Barrel 1 exhausts"
+                explanation = "Second handoff: Barrel 1 exhausts as Barrel 0 takes over working"
             ),
             SequenceStep(
                 stepNumber = 8,
@@ -111,7 +111,7 @@ class ScenarioSequence(private val barrelCount: Int) {
                     0 to BarrelState.WORK,
                     1 to BarrelState.INTAKE
                 ),
-                explanation = "Barrel 1 begins next cycle intake while Barrel 0 works. Sequence loops back to step 2."
+                explanation = "Barrel 1 transitions to intake, completing one full cycle. Loops to step 2."
             )
         )
     }
@@ -138,33 +138,27 @@ class ScenarioSequence(private val barrelCount: Int) {
         if (!isSequenceRunning) {
             return null
         }
-        // First advancement returns step 1 (both INTAKE) once.
-        if (!initialized) {
-            initialized = true
-            currentStepIndex = 0
-            return sequenceSteps[currentStepIndex]
+
+        currentStepIndex += 1
+
+        // After step 8, loop back to step 2 (skip initial pressurization)
+        if (currentStepIndex >= sequenceSteps.size) {
+            currentStepIndex = 1  // Loop to step 2
         }
-        // After initialization, loop endlessly over steps 2..8, never returning step 1 again.
-        if (currentStepIndex < 1) {
-            currentStepIndex = 1
-        } else if (currentStepIndex >= sequenceSteps.lastIndex) {
-            currentStepIndex = 1  // wrap back to step 2
-        } else {
-            currentStepIndex += 1
-        }
+
         return sequenceSteps[currentStepIndex]
     }
 
     /**
-     * Emergency stop - immediately set all barrels to EXHAUST
-     * @return Map of barrel states for emergency stop (all EXHAUST)
+     * Emergency stop - returns EXHAUST for initial safe depressurization
+     * (EXIT will be used in stage 2 of the emergency procedure after depressurization is complete)
+     * @return Map of barrel states for emergency stop stage 1 (all EXHAUST)
      */
     fun stopSequence(): Map<Int, BarrelState> {
         isSequenceRunning = false
         currentStepIndex = -1
-    initialized = false
 
-        // Return emergency state: all barrels EXHAUST
+        // Return emergency state: all barrels EXHAUST for safe depressurization
         return (0 until barrelCount).associateWith { BarrelState.EXHAUST }
     }
 

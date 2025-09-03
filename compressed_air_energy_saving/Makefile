@@ -13,7 +13,7 @@ test: test-logic test-arduino-r3 test-arduino-r4
 
 test-logic:
 	@echo "=== Building and Testing Compressed Air Energy Saving System ==="
-	g++ -std=c++11 logic.cpp test_logic.cc -o test_logic
+	g++ -std=c++11 -DAUTO_START=1 logic.cpp test_logic.cc -o test_logic
 	./test_logic
 
 test-arduino-r3:
