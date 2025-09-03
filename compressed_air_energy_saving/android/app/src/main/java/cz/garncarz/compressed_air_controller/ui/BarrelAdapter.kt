@@ -44,8 +44,8 @@ class BarrelAdapter(
             barrelNameText.text = "Barrel ${barrel.id}"
             barrelStateText.text = barrel.state.name
             pressureText.text = if (barrel.pressureReading != null) "${barrel.pressureReading.toInt()}" else "--"
-            upperSensorText.text = formatSensorValue(barrel.upperWaterSensor)
-            lowerSensorText.text = formatSensorValue(barrel.lowerWaterSensor)
+            upperSensorText.text = formatUpperSensorValue(barrel.upperWaterSensor)
+            lowerSensorText.text = formatLowerSensorValue(barrel.lowerWaterSensor)
 
             // Set state background color based on state
             val context = itemView.context
@@ -64,10 +64,22 @@ class BarrelAdapter(
             }
         }
 
-        private fun formatSensorValue(value: Boolean?): String {
+        private fun formatUpperSensorValue(value: Boolean?): String {
+            // Upper sensor: true = water present, false = no water
             return when (value) {
                 true -> "WET"
                 false -> "DRY"
+                null -> "--"
+            }
+        }
+
+        private fun formatLowerSensorValue(value: Boolean?): String {
+            // Lower sensor: true = no water (below level), false = water present (above level)
+            // Arduino sends L:1 when water is BELOW lower level (DRY)
+            // Arduino sends L:0 when water is ABOVE lower level (WET)
+            return when (value) {
+                true -> "DRY"   // L:1 = no water (below level)
+                false -> "WET"  // L:0 = water present (above level)
                 null -> "--"
             }
         }

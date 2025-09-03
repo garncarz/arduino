@@ -85,6 +85,13 @@ This Android app provides real-time monitoring and control of a multi-barrel com
 - **No Energy Gaps**: Multi-barrel coordination ensures always exactly one barrel is working
 - **Optimized Handoffs**: 2+ barrel systems eliminate WAIT_FOR_INTAKE states for continuous operation
 
+### Water Sensor Display Logic
+The Arduino sends different digital signals for upper and lower water sensors:
+- **Upper Sensor**: `U:1` = water present (WET), `U:0` = no water (DRY)
+- **Lower Sensor**: `L:1` = no water/below level (DRY), `L:0` = water present/above level (WET)
+
+**Note**: Lower sensor logic is inverted because it detects when water drops *below* the lower threshold.
+
 ## 📱 Installation & Setup
 
 ### Prerequisites
@@ -108,7 +115,7 @@ This Android app provides real-time monitoring and control of a multi-barrel com
    ```bash
    # Via USB debugging (device must be authorized)
    adb install ./app/build/outputs/apk/debug/app-debug.apk
-   
+
    # Or transfer APK to device and install manually
    ```
 
@@ -160,11 +167,13 @@ The app includes a comprehensive test suite with **multiple test classes** cover
 
 ## 🏆 Recent Improvements
 
-### ✅ Latest Updates (Pull-to-Refresh & UX Enhancements)
-1. **Pull-to-Refresh Implementation**: Replaced manual "Request Status" button with intuitive swipe-down gesture
-2. **KITT-Style Interface**: Shortened button labels to "AUTO" / "MANUAL" for sleek, futuristic appearance
-3. **Touch Event Optimization**: Fixed SwipeRefreshLayout conflicts with barrel state buttons for reliable interactions
-4. **Comprehensive Testing**: Verified all changes with emulated device testing - all tests PASSED ✅
+### ✅ Latest Updates (Water Sensor Display Fix & UX Improvements)
+1. **Critical Sensor Display Fix**: Corrected lower water sensor display logic - was showing inverted values (L:1→WET instead of DRY)
+2. **Unicode Refresh Button**: Replaced emoji with ⟳ Unicode symbol for consistent display across all Android versions
+3. **Pull-to-Refresh Implementation**: Replaced manual "Request Status" button with intuitive swipe-down gesture
+4. **KITT-Style Interface**: Shortened button labels to "AUTO" / "MANUAL" for sleek, futuristic appearance
+5. **Touch Event Optimization**: Fixed SwipeRefreshLayout conflicts with barrel state buttons for reliable interactions
+6. **Comprehensive Testing**: Verified all changes with emulated device testing - all tests PASSED ✅
 
 ### ✅ Previous Improvements
 1. **Scenario Sequence Implementation**: Complete 2-barrel coordination algorithm with 8-step optimization
