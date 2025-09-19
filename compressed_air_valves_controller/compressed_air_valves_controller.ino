@@ -11,13 +11,13 @@ enum State { INIT, WORK, EXHAUST, INTAKE } state;
 
 
 bool water_over_upper_level(int barrel) {
-    // pull-up input & sensor upside down, water disconnects it
-    return digitalRead(SENSORS_UPPER[barrel]) == HIGH;
+    // sensor upside down, water disconnects it
+    return digitalRead(SENSORS_UPPER[barrel]) == LOW;
 }
 
 bool water_over_lower_level(int barrel) {
-    // pull-up input, water connects
-    return digitalRead(SENSORS_LOWER[barrel]) == LOW;
+    // water connects
+    return digitalRead(SENSORS_LOWER[barrel]) == HIGH;
 }
 
 bool not_enough_pressure(int barrel) {
@@ -58,7 +58,7 @@ void close_valve(int valve) { digitalWrite(valve, HIGH); }
 void open_valve(int valve) { digitalWrite(valve, LOW); }
 
 
-void init() {
+void _init() {
     logger("Init");
     state = INIT;
 
@@ -84,15 +84,15 @@ void setup() {
         pinMode(VALVES_EXHAUST[i], OUTPUT);
         pinMode(VALVES_WORK[i], OUTPUT);
 
-        pinMode(SENSORS_LOWER[i], INPUT_PULLUP);
-        pinMode(SENSORS_UPPER[i], INPUT_PULLUP);
+        pinMode(SENSORS_LOWER[i], INPUT);
+        pinMode(SENSORS_UPPER[i], INPUT);
 
         close_valve(VALVES_INTAKE[i]);
         close_valve(VALVES_EXHAUST[i]);
         close_valve(VALVES_WORK[i]);
     }
 
-    init();
+    _init();
 
     state = WORK;
     logger("Cycle begins");
