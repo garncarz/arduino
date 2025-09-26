@@ -1,13 +1,13 @@
-const int NUM_BARRELS = 1;
+const int NUM_BARRELS = 2;
 
-const int VALVES_INTAKE[] = {2};
-const int VALVES_EXHAUST[] = {3};
-const int VALVES_WORK[] = {4};
+const int VALVES_INTAKE[] = {2, 7};
+const int VALVES_EXHAUST[] = {3, 8};
+const int VALVES_WORK[] = {4, 9};
 
-const int SENSORS_LOWER[] = {5};
-const int SENSORS_UPPER[] = {6};
+const int SENSORS_LOWER[] = {5, 10};
+const int SENSORS_UPPER[] = {6, 11};
 
-enum State { INIT, WORK, EXHAUST, INTAKE } state;
+enum State { INIT, WORK, EXHAUST, INTAKE, READY_FOR_WORK } state[NUM_BARRELS];
 
 
 bool water_over_upper_level(int barrel) {
@@ -34,19 +34,29 @@ const char* state_to_string(State s) {
         case WORK: return "WORK";
         case EXHAUST: return "EXHAUST";
         case INTAKE: return "INTAKE";
+        case READY_FOR_WORK: return "READY";
         default: return "UNKNOWN";
     }
 }
 
 void log_state() {
-    logger(
-        "Barrel 0: " + String(state_to_string(state))
-        // + " P:" + String("TODO")
-        + " L:" + String(digitalRead(SENSORS_LOWER[0]))
-        + " U:" + String(digitalRead(SENSORS_UPPER[0]))
-        + " A2:" + String(analogRead(A2))
-        + " A3:" + String(analogRead(A3))
-    );
+    char line[128] = "";
+    char buf[64];
+
+    for (int i = 0; i < NUM_BARRELS; i++) {
+        snprintf(
+            buf, sizeof(buf),
+            "Barrel %d: %-8s L:%d U:%d",
+            i,
+            state_to_string(state[i]),
+            digitalRead(SENSORS_LOWER[i]),
+            digitalRead(SENSORS_UPPER[i])
+        );
+        strcat(line, buf);
+        if (i < NUM_BARRELS - 1) strcat(line, " | ");
+    }
+
+    logger(line);
 }
 
 void step() {
@@ -60,23 +70,25 @@ void close_valve(int valve) { digitalWrite(valve, HIGH); }
 void open_valve(int valve) { digitalWrite(valve, LOW); }
 
 
-void _init() {
-    logger("Init");
-    state = INIT;
+void _init(int barrel) {
+    logger("Init " + String(barrel));
+    state[barrel] = INIT;
 
-    open_valve(VALVES_WORK[0]);
-    open_valve(VALVES_INTAKE[0]);
+    open_valve(VALVES_WORK[barrel]);
+    open_valve(VALVES_INTAKE[barrel]);
 
-    while (water_over_upper_level(0)) step();
+    while (water_over_upper_level(barrel)) step();
 
-    close_valve(VALVES_WORK[0]);
+    close_valve(VALVES_WORK[barrel]);
 
-    while (not_enough_pressure(0)) step();
+    while (not_enough_pressure(barrel)) step();
 
-    close_valve(VALVES_INTAKE[0]);
+    close_valve(VALVES_INTAKE[barrel]);
 
+    state[barrel] = READY_FOR_WORK;
     log_state();
 }
+
 
 void setup() {
     Serial.begin(9600);
@@ -94,40 +106,47 @@ void setup() {
         close_valve(VALVES_WORK[i]);
     }
 
-    // _init();
+    for (int i = 0; i < NUM_BARRELS; i++) _init(i);
 
-    state = WORK;
+    state[0] = WORK;
     logger("Cycle begins");
 }
 
 
 void loop() {
-    switch (state) {
-        case WORK:
-            if (water_over_lower_level(0))
-                open_valve(VALVES_WORK[0]);
-            else {
-                close_valve(VALVES_WORK[0]);
-                state = EXHAUST;
-            }
-            break;
+    for (int i = 0; i < NUM_BARRELS; i++) {
+        switch (state[i]) {
+            case WORK:
+                if (water_over_lower_level(i))
+                    open_valve(VALVES_WORK[i]);
+                else {
+                    close_valve(VALVES_WORK[i]);
+                    state[i] = EXHAUST;
+                }
+                break;
 
-        case EXHAUST:
-            if (!water_over_upper_level(0))
-                open_valve(VALVES_EXHAUST[0]);
-            else {
-                close_valve(VALVES_EXHAUST[0]);
-                state = INTAKE;
-            }
-            break;
+            case EXHAUST:
+                if (!water_over_upper_level(i))
+                    open_valve(VALVES_EXHAUST[i]);
+                else {
+                    close_valve(VALVES_EXHAUST[i]);
+                    state[i] = INTAKE;
+                }
+                break;
 
-        case INTAKE:
-            // TODO use pressure sensor
-            open_valve(VALVES_INTAKE[0]);
-            delay(1000);
-            close_valve(VALVES_INTAKE[0]);
-            state = WORK;
-            break;
+            case INTAKE:
+                // TODO use pressure sensor
+                open_valve(VALVES_INTAKE[i]);
+                delay(1000);
+                close_valve(VALVES_INTAKE[i]);
+                state[i] = READY_FOR_WORK;
+                break;
+
+            case READY_FOR_WORK:
+                if (state[(i + 1) % NUM_BARRELS] != WORK)
+                    state[i] = WORK;
+                break;
+        }
     }
 
     step();
