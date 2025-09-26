@@ -21,7 +21,7 @@ bool water_over_lower_level(int barrel) {
 }
 
 bool not_enough_pressure(int barrel) {
-    delay(3000); // TODO make the pressure sensor work
+    delay(1000); // TODO make the pressure sensor work
     return 0;
 }
 
@@ -44,6 +44,8 @@ void log_state() {
         // + " P:" + String("TODO")
         + " L:" + String(digitalRead(SENSORS_LOWER[0]))
         + " U:" + String(digitalRead(SENSORS_UPPER[0]))
+        + " A2:" + String(analogRead(A2))
+        + " A3:" + String(analogRead(A3))
     );
 }
 
@@ -92,7 +94,7 @@ void setup() {
         close_valve(VALVES_WORK[i]);
     }
 
-    _init();
+    // _init();
 
     state = WORK;
     logger("Cycle begins");
@@ -120,12 +122,11 @@ void loop() {
             break;
 
         case INTAKE:
-            if (not_enough_pressure(0))
-                open_valve(VALVES_INTAKE[0]);
-            else {
-                close_valve(VALVES_INTAKE[0]);
-                state = WORK;
-            }
+            // TODO use pressure sensor
+            open_valve(VALVES_INTAKE[0]);
+            delay(1000);
+            close_valve(VALVES_INTAKE[0]);
+            state = WORK;
             break;
     }
 
