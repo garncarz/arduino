@@ -21,7 +21,7 @@ bool water_over_lower_level(int barrel) {
 }
 
 bool not_enough_pressure(int barrel) {
-    delay(1000); // TODO make the pressure sensor work
+    delay(2000); // TODO make the pressure sensor work
     return 0;
 }
 
@@ -105,6 +105,8 @@ void setup() {
         close_valve(VALVES_EXHAUST[i]);
         close_valve(VALVES_WORK[i]);
     }
+
+    delay(2000);
 
     for (int i = 0; i < NUM_BARRELS; i++) _init(i);
 
