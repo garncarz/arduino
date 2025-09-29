@@ -21,7 +21,7 @@ bool water_over_lower_level(int barrel) {
 }
 
 bool not_enough_pressure(int barrel) {
-    delay(2000); // TODO make the pressure sensor work
+    delay(4000); // TODO make the pressure sensor work
     return 0;
 }
 
