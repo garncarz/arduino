@@ -7,6 +7,8 @@ const int VALVES_WORK[] = {4, 9};
 const int SENSORS_LOWER[] = {5, 10};
 const int SENSORS_UPPER[] = {6, 11};
 
+const int SENSORS_PRESSURE[] = {A0, A1};
+
 enum State { INIT, WORK, EXHAUST, INTAKE, READY_FOR_WORK } state[NUM_BARRELS];
 
 
@@ -46,11 +48,12 @@ void log_state() {
     for (int i = 0; i < NUM_BARRELS; i++) {
         snprintf(
             buf, sizeof(buf),
-            "Barrel %d: %-8s L:%d U:%d",
+            "Barrel %d: %-8s L:%d U:%d P:%d",
             i,
             state_to_string(state[i]),
             digitalRead(SENSORS_LOWER[i]),
-            digitalRead(SENSORS_UPPER[i])
+            digitalRead(SENSORS_UPPER[i]),
+            analogRead(SENSORS_PRESSURE[i])
         );
         strcat(line, buf);
         if (i < NUM_BARRELS - 1) strcat(line, " | ");
