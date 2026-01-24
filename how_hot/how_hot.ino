@@ -10,6 +10,12 @@ const int TR021A = A3;
 DHT dht(DHTPIN, DHTTYPE);
 
 
+float tmp36ToCelsius(int adcValue) {
+  float voltage = adcValue * (5.0 / 1023.0);
+  return (voltage - 0.5) * 100.0;
+}
+
+
 float ntcToCelsius(int adcValue) {
   // Constants for your setup
   const float R_FIXED = 10000.0;   // 10 kΩ series resistor
@@ -45,7 +51,7 @@ void loop() {
   float dht_temp = dht.readTemperature();
   float dht_hic = dht.computeHeatIndex(dht_temp, dht_humid, false);
   
-  Serial.print("TMP36: " + String(val_tmp36));
+  Serial.print("TMP36: " + String(val_tmp36) + " (" + tmp36ToCelsius(val_tmp36) + " °C)");
   Serial.print(" | TR021A: " + String(val_tr021a));
   Serial.print(" | TZ: " + String(val_tz) + " (" + ntcToCelsius(val_tz) + " °C)");
   Serial.print(" | DHT11 humid/temp/heat index: " + String(dht_humid) + " % / " + String(dht_temp) + " °C / " + String(dht_hic) + " °C");
