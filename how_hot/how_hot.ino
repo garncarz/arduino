@@ -19,11 +19,9 @@ float tmp36ToCelsius(int adcValue) {
 float ntcToCelsius(int adcValue) {
   // Constants for your setup
   const float R_FIXED = 10000.0;   // 10 kΩ series resistor
-  const float R0      = 12000.0;   // 12 kΩ @ 25 °C
-  const float T0      = 25.0 + 273.15;  // 25 °C in Kelvin
-  const float B       = 3950.0;    // Beta constant
-
-  if (adcValue <= 0) return -273.15; // avoid division by zero
+  const float R0      = 14700.0;   // 14.7 kΩ @ 20 °C
+  const float T0      = 20.0 + 273.15;  // 20 °C in Kelvin
+  const float B       = 3603.3;    // Beta constant
 
   // 1) Convert ADC to NTC resistance
   float Rntc = R_FIXED * (1023.0 - adcValue) / adcValue;
@@ -33,6 +31,13 @@ float ntcToCelsius(int adcValue) {
 
   // 3) Convert Kelvin to Celsius
   return T - 273.15;
+}
+
+
+float pt100ToCelsius(int adcValue) {
+  const float R_FIXED = 100.0;
+  float R = R_FIXED * (1023.0 - adcValue) / adcValue;
+  return (R - 100.0) / 0.385;
 }
 
 
@@ -52,7 +57,7 @@ void loop() {
   float dht_hic = dht.computeHeatIndex(dht_temp, dht_humid, false);
   
   Serial.print("TMP36: " + String(val_tmp36) + " (" + tmp36ToCelsius(val_tmp36) + " °C)");
-  Serial.print(" | TR021A: " + String(val_tr021a));
+  Serial.print(" | TR021A: " + String(val_tr021a) + " (" + pt100ToCelsius(val_tr021a) + " °C)");
   Serial.print(" | TZ: " + String(val_tz) + " (" + ntcToCelsius(val_tz) + " °C)");
   Serial.print(" | DHT11 humid/temp/heat index: " + String(dht_humid) + " % / " + String(dht_temp) + " °C / " + String(dht_hic) + " °C");
   Serial.println();
