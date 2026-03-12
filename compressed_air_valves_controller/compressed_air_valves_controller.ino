@@ -9,6 +9,7 @@ const int SENSORS_UPPER[] = {6, 11};
 
 const int SENSORS_PRESSURE[] = {A0, A1};
 
+
 enum State { INIT, WORK, EXHAUST, INTAKE, READY_FOR_WORK } state[NUM_BARRELS];
 
 
@@ -23,8 +24,7 @@ bool water_over_lower_level(int barrel) {
 }
 
 bool not_enough_pressure(int barrel) {
-    delay(4000); // TODO make the pressure sensor work
-    return 0;
+    return analogRead(SENSORS_PRESSURE[barrel]) < 600;
 }
 
 
@@ -48,7 +48,7 @@ void log_state() {
     for (int i = 0; i < NUM_BARRELS; i++) {
         snprintf(
             buf, sizeof(buf),
-            "Barrel %d: %-8s L:%d U:%d P:%d",
+            "Barrel %d: %-8s L:%d U:%d P:%4d",
             i,
             state_to_string(state[i]),
             digitalRead(SENSORS_LOWER[i]),
@@ -92,6 +92,11 @@ void _init(int barrel) {
     log_state();
 }
 
+void exhaust() {
+    for (int i = 0; i < NUM_BARRELS; i++) open_valve(VALVES_EXHAUST[i]);
+    while (1) step();
+}
+
 
 void setup() {
     Serial.begin(9600);
@@ -110,6 +115,8 @@ void setup() {
     }
 
     delay(2000);
+
+    // exhaust();
 
     for (int i = 0; i < NUM_BARRELS; i++) _init(i);
 
@@ -140,11 +147,12 @@ void loop() {
                 break;
 
             case INTAKE:
-                // TODO use pressure sensor
-                open_valve(VALVES_INTAKE[i]);
-                delay(1000);
-                close_valve(VALVES_INTAKE[i]);
-                state[i] = READY_FOR_WORK;
+                if (not_enough_pressure(i)) {
+                    open_valve(VALVES_INTAKE[i]);
+                } else {
+                    close_valve(VALVES_INTAKE[i]);
+                    state[i] = READY_FOR_WORK;
+                }
                 break;
 
             case READY_FOR_WORK:
