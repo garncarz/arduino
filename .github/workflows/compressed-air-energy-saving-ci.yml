@@ -1,0 +1,91 @@
+name: Compressed Air Energy Saving - CI
+
+on:
+  push:
+    paths:
+      - 'compressed_air_energy_saving/**'
+  pull_request:
+    paths:
+      - 'compressed_air_energy_saving/**'
+
+jobs:
+  test-compressed-air-system:
+    runs-on: ubuntu-latest
+    name: Test Compressed Air Energy Saving System
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Install build tools and Arduino development environment
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y build-essential g++ gcc-avr avr-libc
+
+    - name: Setup development environment (Arduino CLI)
+      working-directory: compressed_air_energy_saving
+      run: make setup
+
+    - name: Verify project structure
+      working-directory: compressed_air_energy_saving
+      run: make verify-structure
+
+    - name: Run all tests via Makefile
+      working-directory: compressed_air_energy_saving
+      run: make test
+
+  test-android-app:
+    runs-on: ubuntu-latest
+    name: Test Android App
+    if: contains(github.event.head_commit.modified, 'compressed_air_energy_saving/android/') || contains(github.event.head_commit.added, 'compressed_air_energy_saving/android/') || github.event_name == 'pull_request'
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v4
+
+    - name: Set up JDK 17
+      uses: actions/setup-java@v3
+      with:
+        java-version: '17'
+        distribution: 'temurin'
+
+    - name: Setup Android SDK
+      uses: android-actions/setup-android@v3
+
+    - name: Cache Gradle packages
+      uses: actions/cache@v3
+      with:
+        path: |
+          ~/.gradle/caches
+          ~/.gradle/wrapper
+        key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+        restore-keys: |
+          ${{ runner.os }}-gradle-
+
+    - name: Grant execute permission for gradlew
+      working-directory: compressed_air_energy_saving/android
+      run: chmod +x gradlew
+
+    - name: Run Android tests
+      working-directory: compressed_air_energy_saving/android
+      run: |
+        ./gradlew --version
+        ./gradlew testDebugUnitTest --no-daemon --console=plain
+
+    - name: Build APK for validation
+      working-directory: compressed_air_energy_saving/android
+      run: |
+        ./gradlew assembleDebug --no-daemon --console=plain
+
+    - name: Run static analysis and lint checks
+      working-directory: compressed_air_energy_saving/android
+      run: |
+        ./gradlew lintDebug --no-daemon --console=plain --continue || true
+
+    - name: Validate instrumented test compilation
+      working-directory: compressed_air_energy_saving/android
+      run: |
+        ./gradlew assembleDebugAndroidTest --no-daemon --console=plain
+
+    # Note: Emulator tests are disabled in CI due to GitHub Actions hardware limitations
+    # Run locally with: ./gradlew emuApi30DebugAndroidTest
