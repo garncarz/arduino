@@ -9,8 +9,9 @@ const int SENSORS_UPPER[] = {6, 11};
 
 const int SENSORS_PRESSURE[] = {A0, A1};
 
-
 enum State { INIT, WORK, EXHAUST, INTAKE, READY_FOR_WORK } state[NUM_BARRELS];
+
+unsigned long intake_start_time[] = {0, 0};
 
 
 bool water_over_upper_level(int barrel) {
@@ -23,8 +24,18 @@ bool water_over_lower_level(int barrel) {
     return digitalRead(SENSORS_LOWER[barrel]) == HIGH;
 }
 
+int pressure_threshold(int barrel) {
+    unsigned long elapsed = millis() - intake_start_time[barrel];
+
+    if (elapsed < 1000) return 800;
+    if (elapsed >= 2000) return 490;
+
+    // 1000–2000 ms: interpolate from 800 to 500
+    return 800 - ((elapsed - 1000) * 300 / 1000);
+}
+
 bool not_enough_pressure(int barrel) {
-    return analogRead(SENSORS_PRESSURE[barrel]) < 600;
+    return analogRead(SENSORS_PRESSURE[barrel]) < pressure_threshold(barrel);
 }
 
 
@@ -148,10 +159,14 @@ void loop() {
 
             case INTAKE:
                 if (not_enough_pressure(i)) {
+                    if (intake_start_time[i] == 0) {
+                        intake_start_time[i] = millis();
+                    }
                     open_valve(VALVES_INTAKE[i]);
                 } else {
                     close_valve(VALVES_INTAKE[i]);
                     state[i] = READY_FOR_WORK;
+                    intake_start_time[i] = 0;
                 }
                 break;
 
